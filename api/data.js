@@ -74,6 +74,8 @@ export default async function handler(req, res) {
   }
 }
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 async function fetchAllContacts(token) {
   const ENDPOINT = 'https://api.hubapi.com/crm/v3/objects/contacts/search';
   const HEADERS  = {
@@ -85,6 +87,7 @@ async function fetchAllContacts(token) {
   let after;
 
   do {
+    if (after) await sleep(300);
     const body = {
       filterGroups: [{
         filters: [{
