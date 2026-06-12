@@ -19,9 +19,10 @@ export default async function handler(req, res) {
     const byDayByTerm = {};
 
     for (const { properties: p } of contacts) {
-      const isWA = p.fonte__tbs_ === 'organic social' &&
-                   p.detalhamento_1_da_fonte__tbs_ === 'whatsapp';
-      const isEM = p.fonte__tbs_ === 'email marketing';
+      const fonte = (p.fonte__tbs_ || '').toLowerCase();
+      const det   = (p.detalhamento_1_da_fonte__tbs_ || '').toLowerCase();
+      const isWA  = fonte === 'organic social' && det === 'whatsapp';
+      const isEM  = fonte === 'email marketing';
 
       if (!isWA && !isEM) continue;
 
