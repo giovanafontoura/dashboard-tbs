@@ -146,6 +146,21 @@
     .inp-metric:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(240,130,32,.18); }
     .saved-tag { font-size:10.5px; color:#1D9E75; margin-left:6px; opacity:0; transition:opacity .3s; }
     .saved-tag.show { opacity:1; }
+
+    /* ── PESQUISA ── */
+    .search-wrap { margin-bottom: 12px; }
+    .search-inp {
+      background: var(--bg); border: 0.5px solid var(--border); border-radius: 6px;
+      color: var(--text); padding: 6px 10px; font-size: 12px; outline: none; width: 240px;
+    }
+    .search-inp::placeholder { color: var(--text3); }
+    .search-inp:focus { border-color: var(--accent); }
+
+    /* ── ORDENAÇÃO ── */
+    th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    th.sortable:hover { color: var(--text); }
+    .sico { color: var(--accent); font-size: 8px; margin-left: 2px; }
+    .sico-dim { color: var(--text3); font-size: 8px; margin-left: 2px; }
   </style>
 </head>
 <body>
@@ -205,6 +220,9 @@
   <!-- CRM Consolidado -->
   <div id="tab-crm">
     <p class="nota">Inscrições por utm_term_tbs · verde = WhatsApp · azul = Email · amarelo = negócios The Best School</p>
+    <div class="search-wrap">
+      <input type="text" class="search-inp" id="srchCrm" oninput="setSearch('crm',this.value)" placeholder="Pesquisar term…">
+    </div>
     <div id="wrapCrm" class="chart-wrap"><canvas id="cvCrm"></canvas></div>
     <div id="pgCrm"></div>
   </div>
@@ -221,6 +239,9 @@
         <span class="saved-tag" id="waSavedTag">✔ Salvo</span>
         <button class="btn-edit" onclick="startEdit('wa')">✏ Editar</button>
       </div>
+    </div>
+    <div class="search-wrap">
+      <input type="text" class="search-inp" id="srchWaSend" oninput="setSearch('wa',this.value)" placeholder="Pesquisar disparo…">
     </div>
     <table id="tblWaSend"></table>
     <div id="pgWaSend"></div>
@@ -240,6 +261,9 @@
       </div>
     </div>
     <p class="nota">Preencha entregues, aberturas e cliques · dados salvos no navegador</p>
+    <div class="search-wrap">
+      <input type="text" class="search-inp" id="srchEmStats" oninput="setSearch('em',this.value)" placeholder="Pesquisar disparo…">
+    </div>
     <table id="tblEmStats"></table>
     <div id="pgEmStats"></div>
   </div>
@@ -255,6 +279,9 @@
   <!-- Compras -->
   <div id="tab-comp" style="display:none">
     <p class="nota">Conversão para The Best School · dados de análise de 12/06/2026</p>
+    <div class="search-wrap">
+      <input type="text" class="search-inp" id="srchComp" oninput="setSearch('comp',this.value)" placeholder="Pesquisar utm_term…">
+    </div>
     <table id="tblComp"></table>
     <div id="pgComp"></div>
   </div>
@@ -335,9 +362,14 @@ let crmChart = null, waChart = null, emChart = null, diaChart = null;
 let liveData = null;
 let activeTab = 'crm';
 const PAGE = { crm:1, wa:1, 'wa-send':1, em:1, estats:1, dia:1, comp:1 };
-let pageSize = 10;
+const PAGE_SIZE = { crm:10, wa:10, 'wa-send':10, em:10, estats:10, dia:10, comp:10 };
 let filterStart = null;
 let filterEnd   = null;
+
+const searchQ = { crm:'', wa:'', em:'', comp:'' };
+let waSendSort  = { f: null, d: -1 };
+let emStatsSort = { f: null, d: -1 };
+let compSort    = { f: 'rate', d: -1 };
 
 // Métricas manuais (salvas em localStorage)
 let emailMetrics = {}; // { term: { entregues, aberturas, cliques } }
@@ -494,9 +526,9 @@ function filteredConv() {
 // ─────────────────────────────────────────────────────────────────────────
 // PAGINAÇÃO
 // ─────────────────────────────────────────────────────────────────────────
-function setPageSize(n) {
-  pageSize = n;
-  resetPages();
+function setPageSize(tab, n) {
+  PAGE_SIZE[tab] = n;
+  PAGE[tab] = 1;
   if (liveData) reRenderTab();
 }
 
@@ -518,11 +550,12 @@ function reRenderTab() {
 function buildPager(elId, tab, total) {
   const el = document.getElementById(elId);
   if (!el || total === 0) { if (el) el.innerHTML = ''; return; }
-  const pages = Math.ceil(total / pageSize);
+  const sz  = PAGE_SIZE[tab] || 10;
+  const pages = Math.ceil(total / sz);
   const cur   = PAGE[tab];
 
   const szBtns = [10, 20, 30].map(n =>
-    `<button class="psz-btn${pageSize===n?' on':''}" onclick="setPageSize(${n})">${n}</button>`
+    `<button class="psz-btn${sz===n?' on':''}" onclick="setPageSize('${tab}',${n})">${n}</button>`
   ).join('');
 
   let pgBtns = `<button class="pg-btn" onclick="goPage('${tab}',${cur-1})" ${cur<=1?'disabled':''}>‹</button>`;
@@ -536,8 +569,8 @@ function buildPager(elId, tab, total) {
 
   pgBtns += `<button class="pg-btn" onclick="goPage('${tab}',${cur+1})" ${cur>=pages?'disabled':''}>›</button>`;
 
-  const from = Math.min((cur-1)*pageSize + 1, total);
-  const to   = Math.min(cur*pageSize, total);
+  const from = Math.min((cur-1)*sz + 1, total);
+  const to   = Math.min(cur*sz, total);
 
   el.innerHTML = `<div class="pager">
     <div class="pager-l">
@@ -550,8 +583,45 @@ function buildPager(elId, tab, total) {
 }
 
 function slicePage(arr, tab) {
-  const p = PAGE[tab];
-  return arr.slice((p-1)*pageSize, p*pageSize);
+  const sz = PAGE_SIZE[tab] || 10;
+  const p  = PAGE[tab];
+  return arr.slice((p-1)*sz, p*sz);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// PESQUISA E ORDENAÇÃO
+// ─────────────────────────────────────────────────────────────────────────
+function setSearch(tab, v) {
+  searchQ[tab] = v.toLowerCase().trim();
+  PAGE[tab] = 1;
+  if (tab === 'wa') PAGE['wa-send'] = 1;
+  if (tab === 'em') PAGE['estats']  = 1;
+  if (liveData) reRenderTab();
+}
+
+function sico(sortObj, field) {
+  if (sortObj.f !== field) return `<span class="sico-dim">⇅</span>`;
+  return sortObj.d === -1 ? `<span class="sico">▼</span>` : `<span class="sico">▲</span>`;
+}
+
+function toggleSort(sortObj, field) {
+  if (sortObj.f === field) sortObj.d *= -1;
+  else { sortObj.f = field; sortObj.d = -1; }
+}
+
+function sortWaSend(field) {
+  toggleSort(waSendSort, field);
+  if (liveData) { renderWaSends(filteredTerms(liveData)); }
+}
+
+function sortEmStats(field) {
+  toggleSort(emStatsSort, field);
+  if (liveData) { renderEmStats(filteredTerms(liveData)); }
+}
+
+function sortComp(field) {
+  toggleSort(compSort, field);
+  if (liveData) renderCompTable();
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -654,7 +724,9 @@ function chartH(n) { return Math.max(200, n * 28); }
 // ─────────────────────────────────────────────────────────────────────────
 function renderCrmChart(terms) {
   if (crmChart) { crmChart.destroy(); crmChart = null; }
-  const vis = slicePage(terms, 'crm');
+  const q = searchQ.crm;
+  const filtered = q ? terms.filter(x => lbl(x.t).toLowerCase().includes(q)) : terms;
+  const vis = slicePage(filtered, 'crm');
   document.getElementById('wrapCrm').style.height = chartH(vis.length) + 'px';
   const colors = vis.map(x => x.em > 0 && x.wa === 0 ? '#185FA5' : '#1D9E75');
   crmChart = new Chart(document.getElementById('cvCrm').getContext('2d'), {
@@ -666,9 +738,9 @@ function renderCrmChart(terms) {
         { label:'Negócios',   data:vis.map(x => x.d),       backgroundColor:'#F59E0B', borderRadius:2, barThickness:4 }
       ]
     },
-    options: barOpts('crm', vis, terms)
+    options: barOpts('crm', vis, filtered)
   });
-  buildPager('pgCrm', 'crm', terms.length);
+  buildPager('pgCrm', 'crm', filtered.length);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -793,7 +865,7 @@ function renderDiaTable(byDay) {
   const maxTot = Math.max(...sorted.map(([,v]) => v.wa+v.em), 1);
   const vis = slicePage(sorted, 'dia');
 
-  let acum = sorted.slice(0, (PAGE.dia-1)*pageSize).reduce((s,[,v]) => s+v.wa+v.em, 0);
+  let acum = sorted.slice(0, (PAGE.dia-1)*(PAGE_SIZE.dia||10)).reduce((s,[,v]) => s+v.wa+v.em, 0);
 
   let h = `<thead><tr>
     <th>Dia</th><th></th>
@@ -846,18 +918,31 @@ function renderDiaTable(byDay) {
 // TABELA COMPRAS
 // ─────────────────────────────────────────────────────────────────────────
 function renderCompTable() {
-  const rows = filteredConv().sort((a, b) => {
+  const q = searchQ.comp;
+  let rows = filteredConv()
+    .filter(r => !q || r.t.toLowerCase().includes(q));
+
+  // ordenação
+  const sf = compSort.f;
+  rows.sort((a, b) => {
     const ra = a.insc ? a.d/a.insc : 0;
     const rb = b.insc ? b.d/b.insc : 0;
-    return rb - ra;
+    if (sf === 'insc')  return (b.insc - a.insc) * compSort.d;
+    if (sf === 'deals') return (b.d    - a.d)    * compSort.d;
+    return (rb - ra) * compSort.d;
   });
-  const maxRate = Math.max(...rows.map(r => r.insc ? r.d/r.insc : 0));
+
+  const maxRate = Math.max(...rows.map(r => r.insc ? r.d/r.insc : 0), 0.001);
   const vis = slicePage(rows, 'comp');
+
+  const th = (label, field, cls='r') =>
+    `<th class="${cls} sortable" onclick="sortComp('${field}')">${label}${sico(compSort,field)}</th>`;
 
   let h = `<thead><tr>
     <th>utm_term_tbs</th><th>Canal</th>
-    <th class="r">Inscrições</th><th class="r">Negócios</th>
-    <th style="width:32%">Conversão</th>
+    ${th('Inscrições','insc')}
+    ${th('Negócios','deals')}
+    ${th('Conversão','rate','sortable')}
   </tr></thead><tbody>`;
 
   vis.forEach(r => {
@@ -937,20 +1022,38 @@ function renderHeatmap() {
 // WA SENDS (tabela editável)
 // ─────────────────────────────────────────────────────────────────────────
 function renderWaSends(terms) {
-  const waTerms = terms.filter(x => x.wa > 0).sort((a, b) => b.wa - a.wa);
+  const q = searchQ.wa;
+  let waTerms = terms.filter(x => x.wa > 0)
+    .filter(x => !q || lbl(x.t).toLowerCase().includes(q));
+
+  // ordenação
+  const sf = waSendSort.f;
+  waTerms.sort((a, b) => {
+    let va, vb;
+    if (sf === 'disparos')  { va = (waMetrics[a.t]||{}).disparos||0;  vb = (waMetrics[b.t]||{}).disparos||0; }
+    else if (sf === 'aberturas') { va = (waMetrics[a.t]||{}).aberturas||0; vb = (waMetrics[b.t]||{}).aberturas||0; }
+    else if (sf === 'cliques')   { va = (waMetrics[a.t]||{}).cliques||0;   vb = (waMetrics[b.t]||{}).cliques||0; }
+    else if (sf === 'insc')      { va = a.wa; vb = b.wa; }
+    else                         { va = a.wa; vb = b.wa; return vb - va; }
+    return (vb - va) * waSendSort.d;
+  });
+
   const el = document.getElementById('tblWaSend');
   if (!el) return;
 
   const vis = waEditing ? waTerms : slicePage(waTerms, 'wa-send');
 
+  const th = (label, field) =>
+    `<th class="r sortable" onclick="sortWaSend('${field}')">${label}${sico(waSendSort,field)}</th>`;
+
   let h = `<thead><tr>
     <th>Disparo</th>
-    <th class="r">Disparados</th>
-    <th class="r">Aberturas</th>
+    ${th('Disparados','disparos')}
+    ${th('Aberturas','aberturas')}
     <th class="r">% Abert.</th>
-    <th class="r">Cliques</th>
+    ${th('Cliques','cliques')}
     <th class="r">% Clique</th>
-    <th class="r">Inscrições</th>
+    ${th('Inscrições','insc')}
     <th class="r">% Conv.</th>
   </tr></thead><tbody>`;
 
@@ -991,21 +1094,38 @@ function renderWaSends(terms) {
 // EMAIL STATS (tabela editável)
 // ─────────────────────────────────────────────────────────────────────────
 function renderEmStats(terms) {
-  const emTerms = terms.filter(x => x.em > 0).sort((a, b) => b.em - a.em);
+  const q = searchQ.em;
+  let emTerms = terms.filter(x => x.em > 0)
+    .filter(x => !q || lbl(x.t).toLowerCase().includes(q));
+
+  // ordenação
+  const sf = emStatsSort.f;
+  emTerms.sort((a, b) => {
+    let va, vb;
+    if (sf === 'entregues')  { va = (emailMetrics[a.t]||{}).entregues||0;  vb = (emailMetrics[b.t]||{}).entregues||0; }
+    else if (sf === 'aberturas') { va = (emailMetrics[a.t]||{}).aberturas||0; vb = (emailMetrics[b.t]||{}).aberturas||0; }
+    else if (sf === 'cliques')   { va = (emailMetrics[a.t]||{}).cliques||0;   vb = (emailMetrics[b.t]||{}).cliques||0; }
+    else if (sf === 'insc')      { va = a.em; vb = b.em; }
+    else                         { va = a.em; vb = b.em; return vb - va; }
+    return (vb - va) * emStatsSort.d;
+  });
+
   const el = document.getElementById('tblEmStats');
   if (!el) return;
 
-  // in edit mode show all rows; otherwise paginate
   const vis = emEditing ? emTerms : slicePage(emTerms, 'estats');
+
+  const th = (label, field) =>
+    `<th class="r sortable" onclick="sortEmStats('${field}')">${label}${sico(emStatsSort,field)}</th>`;
 
   let h = `<thead><tr>
     <th>Disparo</th>
-    <th class="r">Entregues</th>
-    <th class="r">Aberturas</th>
+    ${th('Entregues','entregues')}
+    ${th('Aberturas','aberturas')}
     <th class="r">% Abert.</th>
-    <th class="r">Cliques</th>
+    ${th('Cliques','cliques')}
     <th class="r">% Clique</th>
-    <th class="r">Inscrições</th>
+    ${th('Inscrições','insc')}
     <th class="r">% Conv.</th>
   </tr></thead><tbody>`;
 

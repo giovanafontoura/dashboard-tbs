@@ -8,23 +8,25 @@ export default async function handler(req, res) {
   }
 
   try {
-    const [contacts, dealsTotal] = await Promise.all([
-      fetchAllContacts(token),
-      fetchDealsCount(token)
-    ]);
+    const contacts = await fetchAllContacts(token);
 
     const waByTerm = {};
     const emByTerm = {};
     const byDay = {};
     const byDayByTerm = {};
+    const waIds = new Set();
+    const emIds = new Set();
 
-    for (const { properties: p } of contacts) {
+    for (const { id, properties: p } of contacts) {
       const fonte = (p.fonte__tbs_ || '').toLowerCase();
       const det   = (p.detalhamento_1_da_fonte__tbs_ || '').toLowerCase();
       const isWA  = fonte === 'organic social' && det === 'whatsapp';
       const isEM  = fonte === 'email marketing';
 
       if (!isWA && !isEM) continue;
+
+      if (isWA) waIds.add(String(id));
+      if (isEM) emIds.add(String(id));
 
       const term = p.utm_term_tbs || 'sem_term';
       const day  = p.tbs_2026__data_de_inscricao
@@ -50,6 +52,8 @@ export default async function handler(req, res) {
         }
       }
     }
+
+    const dealsTotal = await fetchDealsCount(token, waIds, emIds);
 
     const totWA = Object.values(waByTerm).reduce((a, b) => a + b, 0);
     const totEM = Object.values(emByTerm).reduce((a, b) => a + b, 0);
@@ -126,30 +130,54 @@ async function fetchAllContacts(token) {
   return all;
 }
 
-async function fetchDealsCount(token) {
-  const resp = await fetch('https://api.hubapi.com/crm/v3/objects/deals/search', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      filterGroups: [
-        { filters: [
-          { propertyName: 'pipeline',   operator: 'EQ', value: '904543067' },
-          { propertyName: 'dealstage',  operator: 'EQ', value: '1372708683' },
-          { propertyName: 'fonte__tbs_', operator: 'EQ', value: 'email marketing' }
-        ]},
-        { filters: [
-          { propertyName: 'pipeline',   operator: 'EQ', value: '904543067' },
-          { propertyName: 'dealstage',  operator: 'EQ', value: '1372708683' },
-          { propertyName: 'fonte__tbs_', operator: 'EQ', value: 'organic social' },
-          { propertyName: 'detalhamento_1_da_fonte__tbs_', operator: 'EQ', value: 'whatsapp' }
-        ]}
-      ],
-      limit: 1
-    })
-  });
-  const data = await resp.json();
-  return data.total || 0;
+async function fetchDealsCount(token, waIds, emIds) {
+  const allContactIds = new Set([...waIds, ...emIds]);
+  const HEADERS = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  };
+
+  // Step 1: fetch all deal IDs in pipeline + stage
+  const dealIds = [];
+  let after;
+  do {
+    if (after) await sleep(300);
+    const resp = await fetch('https://api.hubapi.com/crm/v3/objects/deals/search', {
+      method: 'POST',
+      headers: HEADERS,
+      body: JSON.stringify({
+        filterGroups: [{ filters: [
+          { propertyName: 'pipeline',  operator: 'EQ', value: '904543067' },
+          { propertyName: 'dealstage', operator: 'EQ', value: '1372708683' }
+        ]}],
+        properties: ['hs_object_id'],
+        limit: 100,
+        ...(after && { after })
+      })
+    });
+    if (!resp.ok) throw new Error(`HubSpot Deals ${resp.status}: ${await resp.text()}`);
+    const data = await resp.json();
+    for (const d of (data.results || [])) dealIds.push(d.id);
+    after = data.paging?.next?.after;
+  } while (after);
+
+  // Step 2: for each batch of deals, check if any associated contact is WA/EM
+  let count = 0;
+  for (let i = 0; i < dealIds.length; i += 100) {
+    if (i > 0) await sleep(300);
+    const batch = dealIds.slice(i, i + 100);
+    const resp = await fetch('https://api.hubapi.com/crm/v4/associations/deals/contacts/batch/read', {
+      method: 'POST',
+      headers: HEADERS,
+      body: JSON.stringify({ inputs: batch.map(id => ({ id: String(id) })) })
+    });
+    if (!resp.ok) continue;
+    const data = await resp.json();
+    for (const result of (data.results || [])) {
+      const cids = (result.to || []).map(t => String(t.toObjectId));
+      if (cids.some(cid => allContactIds.has(cid))) count++;
+    }
+  }
+
+  return count;
 }
