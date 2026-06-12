@@ -140,7 +140,8 @@
 
   <div class="nav">
     <button class="tab-btn active" id="btn-crm"  onclick="setTab('crm')">CRM Consolidado</button>
-    <button class="tab-btn"        id="btn-tipo" onclick="setTab('tipo')">Por tipo</button>
+    <button class="tab-btn"        id="btn-wa"   onclick="setTab('wa')">WhatsApp</button>
+    <button class="tab-btn"        id="btn-em"   onclick="setTab('em')">Email</button>
     <button class="tab-btn"        id="btn-dia"  onclick="setTab('dia')">Por dia</button>
     <button class="tab-btn"        id="btn-comp" onclick="setTab('comp')">Compras</button>
     <button class="tab-btn"        id="btn-heat" onclick="setTab('heat')">Heatmap</button>
@@ -152,10 +153,16 @@
     <div class="chart-wrap"><canvas id="cvCrm"></canvas></div>
   </div>
 
-  <!-- Por tipo -->
-  <div id="tab-tipo" style="display:none;">
-    <p class="nota">WhatsApp vs Email por disparo</p>
-    <div class="chart-wrap"><canvas id="cvTipo"></canvas></div>
+  <!-- WhatsApp -->
+  <div id="tab-wa" style="display:none;">
+    <p class="nota">Inscrições via WhatsApp por disparo · amarelo = negócios The Best School</p>
+    <div id="wrapWA" class="chart-wrap"><canvas id="cvWA"></canvas></div>
+  </div>
+
+  <!-- Email -->
+  <div id="tab-em" style="display:none;">
+    <p class="nota">Inscrições via Email por disparo · amarelo = negócios The Best School</p>
+    <div id="wrapEM" class="chart-wrap"><canvas id="cvEM"></canvas></div>
   </div>
 
   <!-- Por dia -->
@@ -259,8 +266,9 @@ const H = [
 // ─────────────────────────────────────────────────────────────────────────
 // ESTADO
 // ─────────────────────────────────────────────────────────────────────────
-let crmChart  = null;
-let tipoChart = null;
+let crmChart = null;
+let waChart  = null;
+let emChart  = null;
 let liveData  = null;
 let activeTab = 'crm';
 
@@ -342,7 +350,8 @@ function renderAll(data) {
 
   const terms = buildTerms(data);
   renderCrmChart(terms);
-  renderTipoChart(terms);
+  renderWaChart(terms);
+  renderEmChart(terms);
   renderDiaTable(data.byDay);
   renderCompTable();
   renderHeatmap();
@@ -444,21 +453,24 @@ function renderCrmChart(terms) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// CHART: POR TIPO
+// CHART: WHATSAPP
 // ─────────────────────────────────────────────────────────────────────────
-function renderTipoChart(terms) {
-  if (tipoChart) { tipoChart.destroy(); tipoChart = null; }
+function renderWaChart(terms) {
+  if (waChart) { waChart.destroy(); waChart = null; }
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
   const tickColor = isDark ? '#9CA3AF' : '#6B7280';
 
-  tipoChart = new Chart(document.getElementById('cvTipo').getContext('2d'), {
+  const waTerms = terms.filter(x => x.wa > 0).sort((a, b) => b.wa - a.wa);
+  document.getElementById('wrapWA').style.height = Math.max(300, waTerms.length * 26) + 'px';
+
+  waChart = new Chart(document.getElementById('cvWA').getContext('2d'), {
     type: 'bar',
     data: {
-      labels: terms.map(x => label(x.t)),
+      labels: waTerms.map(x => label(x.t)),
       datasets: [
-        { label: 'WhatsApp', data: terms.map(x => x.wa), backgroundColor: '#1D9E75', barThickness: 12 },
-        { label: 'Email',    data: terms.map(x => x.em), backgroundColor: '#185FA5', barThickness: 12 }
+        { label: 'Inscrições WA', data: waTerms.map(x => x.wa), backgroundColor: '#1D9E75', borderRadius: 3, barThickness: 12 },
+        { label: 'Negócios TBS',  data: waTerms.map(x => x.d),  backgroundColor: '#F59E0B', borderRadius: 2, barThickness: 4 }
       ]
     },
     options: {
@@ -466,15 +478,71 @@ function renderTipoChart(terms) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: {
-          display: true,
-          position: 'top',
-          labels: { color: tickColor, font: { size: 11 } }
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: c => c[0].label,
+            afterBody: c => {
+              const x = waTerms[c[0].dataIndex];
+              const lines = ['WhatsApp: ' + x.wa];
+              if (x.d) lines.push('Negócios fechados: ' + x.d);
+              if (x.d && x.wa) lines.push('Conversão: ' + (x.d / x.wa * 100).toFixed(1) + '%');
+              return lines;
+            }
+          }
         }
       },
       scales: {
-        x: { stacked: true, grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 } } },
-        y: { stacked: true, ticks: { color: tickColor, font: { size: 11 } } }
+        x: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 } } },
+        y: { ticks: { color: tickColor, font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CHART: EMAIL
+// ─────────────────────────────────────────────────────────────────────────
+function renderEmChart(terms) {
+  if (emChart) { emChart.destroy(); emChart = null; }
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const tickColor = isDark ? '#9CA3AF' : '#6B7280';
+
+  const emTerms = terms.filter(x => x.em > 0).sort((a, b) => b.em - a.em);
+  document.getElementById('wrapEM').style.height = Math.max(300, emTerms.length * 26) + 'px';
+
+  emChart = new Chart(document.getElementById('cvEM').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: emTerms.map(x => label(x.t)),
+      datasets: [
+        { label: 'Inscrições Email', data: emTerms.map(x => x.em), backgroundColor: '#185FA5', borderRadius: 3, barThickness: 12 },
+        { label: 'Negócios TBS',     data: emTerms.map(x => x.d),  backgroundColor: '#F59E0B', borderRadius: 2, barThickness: 4 }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: c => c[0].label,
+            afterBody: c => {
+              const x = emTerms[c[0].dataIndex];
+              const lines = ['Email: ' + x.em];
+              if (x.d) lines.push('Negócios fechados: ' + x.d);
+              if (x.d && x.em) lines.push('Conversão: ' + (x.d / x.em * 100).toFixed(1) + '%');
+              return lines;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 } } },
+        y: { ticks: { color: tickColor, font: { size: 11 } } }
       }
     }
   });
@@ -636,7 +704,7 @@ function renderHeatmap() {
 // TROCAR ABA
 // ─────────────────────────────────────────────────────────────────────────
 function setTab(t) {
-  ['crm','tipo','dia','comp','heat'].forEach(id => {
+  ['crm','wa','em','dia','comp','heat'].forEach(id => {
     document.getElementById('tab-' + id).style.display = id === t ? 'block' : 'none';
     document.getElementById('btn-' + id).className     = id === t ? 'tab-btn active' : 'tab-btn';
   });
@@ -644,8 +712,9 @@ function setTab(t) {
 
   if (liveData) {
     const terms = buildTerms(liveData);
-    if (t === 'crm')  renderCrmChart(terms);
-    if (t === 'tipo') renderTipoChart(terms);
+    if (t === 'crm') renderCrmChart(terms);
+    if (t === 'wa')  renderWaChart(terms);
+    if (t === 'em')  renderEmChart(terms);
   }
 }
 

@@ -124,10 +124,19 @@ async function fetchDealsCount(token) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      filterGroups: [{ filters: [
-        { propertyName: 'pipeline',  operator: 'EQ', value: '904543067' },
-        { propertyName: 'dealstage', operator: 'EQ', value: '1372708683' }
-      ]}],
+      filterGroups: [
+        { filters: [
+          { propertyName: 'pipeline',   operator: 'EQ', value: '904543067' },
+          { propertyName: 'dealstage',  operator: 'EQ', value: '1372708683' },
+          { propertyName: 'fonte__tbs_', operator: 'EQ', value: 'email marketing' }
+        ]},
+        { filters: [
+          { propertyName: 'pipeline',   operator: 'EQ', value: '904543067' },
+          { propertyName: 'dealstage',  operator: 'EQ', value: '1372708683' },
+          { propertyName: 'fonte__tbs_', operator: 'EQ', value: 'organic social' },
+          { propertyName: 'detalhamento_1_da_fonte__tbs_', operator: 'EQ', value: 'whatsapp' }
+        ]}
+      ],
       limit: 1
     })
   });
