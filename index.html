@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard TBS 2026</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:     #FFFFFF;
+      --bg2:    #F7F8FA;
+      --border: #E5E7EB;
+      --text:   #111827;
+      --text2:  #6B7280;
+      --text3:  #9CA3AF;
+      --r:      8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:     #0F0F0F;
+        --bg2:    #1A1A1A;
+        --border: #2C2C2C;
+        --text:   #F3F4F6;
+        --text2:  #9CA3AF;
+        --text3:  #4B5563;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 28px 20px 60px; }
+    .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
+    h1 { font-size: 17px; font-weight: 600; margin-bottom: 3px; }
+    .status { font-size: 11.5px; color: var(--text3); }
+    .btn-refresh {
+      padding: 7px 13px; font-size: 12px;
+      border: 0.5px solid var(--border); border-radius: var(--r);
+      background: transparent; color: var(--text2); cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-refresh:hover { background: var(--bg2); }
+    .btn-refresh.loading { opacity: 0.5; pointer-events: none; }
+
+    /* ── CARDS ── */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 600px) { .cards { grid-template-columns: repeat(2, 1fr); } }
+    .card {
+      background: var(--bg2);
+      border-radius: var(--r);
+      padding: 14px 16px;
+    }
+    .card-label { font-size: 10.5px; color: var(--text2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .4px; }
+    .card-value { font-size: 26px; font-weight: 500; line-height: 1; }
+    .card-sub   { font-size: 10px; color: var(--text3); margin-top: 4px; }
+
+    /* ── TABS ── */
+    .nav {
+      display: flex; flex-wrap: wrap;
+      border: 0.5px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+      width: fit-content;
+      margin-bottom: 16px;
+    }
+    .tab-btn {
+      padding: 8px 15px; font-size: 12.5px;
+      border: none; cursor: pointer;
+      background: transparent; color: var(--text2);
+      white-space: nowrap;
+    }
+    .tab-btn.active { background: var(--text); color: var(--bg); }
+    .tab-btn + .tab-btn { border-left: 0.5px solid var(--border); }
+
+    /* ── CHART ── */
+    .chart-wrap { height: 660px; position: relative; }
+
+    /* ── TABLE ── */
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left; padding: 6px 8px 9px;
+      font-size: 11px; font-weight: 500; color: var(--text2);
+      border-bottom: 0.5px solid var(--border);
+      white-space: nowrap;
+    }
+    th.r, td.r { text-align: right; }
+    td { padding: 8px; font-size: 12.5px; border-bottom: 0.5px solid var(--border); }
+    td:first-child, th:first-child { padding-left: 0; }
+
+    .badge {
+      display: inline-block;
+      font-size: 10px; padding: 2px 6px;
+      border-radius: 3px; white-space: nowrap;
+    }
+
+    /* ── NOTA ── */
+    .nota { font-size: 11px; color: var(--text3); margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div>
+      <h1>Dashboard TBS 2026</h1>
+      <p class="status" id="status">Carregando dados do HubSpot…</p>
+    </div>
+    <button class="btn-refresh" id="btnRefresh" onclick="loadData()">↻ Atualizar</button>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <p class="card-label">WhatsApp</p>
+      <p class="card-value" id="cWA">—</p>
+      <p class="card-sub">organic social</p>
+    </div>
+    <div class="card">
+      <p class="card-label">Email</p>
+      <p class="card-value" id="cEM">—</p>
+      <p class="card-sub">email marketing</p>
+    </div>
+    <div class="card">
+      <p class="card-label">Total inscritos</p>
+      <p class="card-value" id="cTot">—</p>
+      <p class="card-sub">WA + Email</p>
+    </div>
+    <div class="card">
+      <p class="card-label">Negócios fechados</p>
+      <p class="card-value" id="cDeals">—</p>
+      <p class="card-sub">The Best School</p>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button class="tab-btn active" id="btn-crm"  onclick="setTab('crm')">CRM Consolidado</button>
+    <button class="tab-btn"        id="btn-tipo" onclick="setTab('tipo')">Por tipo</button>
+    <button class="tab-btn"        id="btn-dia"  onclick="setTab('dia')">Por dia</button>
+    <button class="tab-btn"        id="btn-comp" onclick="setTab('comp')">Compras</button>
+    <button class="tab-btn"        id="btn-heat" onclick="setTab('heat')">Heatmap</button>
+  </div>
+
+  <!-- CRM Consolidado -->
+  <div id="tab-crm">
+    <p class="nota">Inscrições por utm_term_tbs · verde = WhatsApp · azul = Email · amarelo = negócios The Best School</p>
+    <div class="chart-wrap"><canvas id="cvCrm"></canvas></div>
+  </div>
+
+  <!-- Por tipo -->
+  <div id="tab-tipo" style="display:none;">
+    <p class="nota">WhatsApp vs Email por disparo</p>
+    <div class="chart-wrap"><canvas id="cvTipo"></canvas></div>
+  </div>
+
+  <!-- Por dia -->
+  <div id="tab-dia" style="display:none;">
+    <div id="divDia"><p class="nota">Carregando…</p></div>
+  </div>
+
+  <!-- Compras -->
+  <div id="tab-comp" style="display:none;">
+    <p class="nota">Conversão para The Best School · dados de análise de 12/06/2026</p>
+    <table id="tblComp"></table>
+  </div>
+
+  <!-- Heatmap -->
+  <div id="tab-heat" style="display:none;">
+    <p class="nota">Inscrições por hora (BRT) × base de contatos · dados de análise de 12/06/2026</p>
+    <div style="overflow-x:auto;">
+      <table id="tblHeat" style="font-size:10.5px;"></table>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+// ─────────────────────────────────────────────────────────────────────────
+// DADOS ESTÁTICOS (análise de 12/06/2026 — compras + heatmap)
+// ─────────────────────────────────────────────────────────────────────────
+const CONV = [
+  // Email
+  {t:'basefria-030626',          ch:'Email', insc:18,  d:10},
+  {t:'basequente-010626',        ch:'Email', insc:31,  d:14},
+  {t:'basequente-020626',        ch:'Email', insc:11,  d:3},
+  {t:'pno-fluxo01',              ch:'Email', insc:25,  d:6},
+  {t:'basefria-010626',          ch:'Email', insc:34,  d:6},
+  {t:'pno-050626',               ch:'Email', insc:22,  d:4},
+  {t:'baseqrcodecargos02-010626',ch:'Email', insc:8,   d:1},
+  {t:'baseqrcodecargos01-010626',ch:'Email', insc:4,   d:1},
+  {t:'preinscrito26-fluxo01',    ch:'Email', insc:6,   d:1},
+  {t:'030626',                   ch:'Email', insc:20,  d:2},
+  {t:'inscritos24-fluxo01',      ch:'Email', insc:8,   d:0},
+  {t:'pno-fluxo02',              ch:'Email', insc:3,   d:0},
+  // WhatsApp
+  {t:'preinscritos26-090626',    ch:'WA',   insc:20,  d:11},
+  {t:'preinscritos26-100626',    ch:'WA',   insc:80,  d:24},
+  {t:'pnv-040626',               ch:'WA',   insc:79,  d:16},
+  {t:'pnv-060626',               ch:'WA',   insc:63,  d:16},
+  {t:'pnv-070626',               ch:'WA',   insc:75,  d:14},
+  {t:'preinscritos2025-040626',  ch:'WA',   insc:50,  d:13},
+  {t:'pnv-050626',               ch:'WA',   insc:68,  d:11},
+  {t:'inscritos2025-040626',     ch:'WA',   insc:60,  d:15},
+  {t:'inscritos2025-070626',     ch:'WA',   insc:77,  d:5},
+  {t:'inscritos2025-060626',     ch:'WA',   insc:75,  d:10},
+  {t:'inscritos2025-050626',     ch:'WA',   insc:64,  d:6},
+  {t:'inscritos25-080626',       ch:'WA',   insc:41,  d:3},
+  {t:'inscritos2024-040626',     ch:'WA',   insc:41,  d:3},
+  {t:'inscritos25-090625',       ch:'WA',   insc:13,  d:3},
+  {t:'pno-040626',               ch:'WA',   insc:32,  d:3},
+  {t:'pnv-110626',               ch:'WA',   insc:26,  d:4},
+  {t:'pnv-100626',               ch:'WA',   insc:22,  d:3},
+  {t:'pnv-080626',               ch:'WA',   insc:17,  d:1},
+  {t:'inscritos25-110626',       ch:'WA',   insc:13,  d:1},
+  {t:'preinscritos25-040626',    ch:'WA',   insc:30,  d:2},
+  {t:'preinscritos26-050626',    ch:'WA',   insc:12,  d:2},
+  {t:'pno-100626',               ch:'WA',   insc:9,   d:1},
+  {t:'comunidade-0206',          ch:'WA',   insc:6,   d:1},
+  {t:'inscritos25-100626',       ch:'WA',   insc:8,   d:0},
+  {t:'pnv-090626',               ch:'WA',   insc:8,   d:0},
+];
+
+const HBASES = ['Base Fria','Base Quente','Comunidade','Inscritos 2024','Inscritos 2025','Outros','PNO','PNV','Pré-insc. 25','Pré-insc. 26','QR Code','QR Cargos'];
+const HCHAN  = ['Email','Email','WA','WA·Auto','WA','Email','WA·Auto·Em','WA','WA','WA·Auto','WA','Email'];
+const HCOL   = ['#185FA5','#185FA5','#1D9E75','#7F77DD','#1D9E75','#185FA5','#7F77DD','#1D9E75','#1D9E75','#7F77DD','#1D9E75','#185FA5'];
+const H = [
+  [1,0,0,1,2,1,1,1,1,0,0,0],
+  [2,0,0,0,0,1,1,2,0,0,0,0],
+  [0,1,0,0,0,0,0,0,0,1,0,0],
+  [0,0,0,0,0,0,1,0,0,0,0,0],
+  [0,0,0,0,1,0,1,0,0,1,0,0],
+  [0,0,0,1,3,0,0,1,0,0,0,0],
+  [0,1,0,0,2,0,0,1,1,1,0,0],
+  [2,0,0,3,4,0,2,2,2,0,0,0],
+  [1,1,0,1,3,0,1,3,0,0,0,0],
+  [2,5,0,1,8,3,7,4,0,28,0,1],
+  [4,3,2,1,6,4,5,6,2,0,0,0],
+  [1,1,2,1,29,5,2,10,19,0,0,1],
+  [0,1,1,2,14,1,14,9,14,0,0,0],
+  [2,0,1,0,73,1,4,97,8,6,0,0],
+  [0,2,0,0,22,1,4,26,3,5,1,2],
+  [3,5,0,0,10,1,3,18,4,1,1,2],
+  [5,4,1,18,18,1,10,6,2,5,0,2],
+  [2,1,0,6,59,0,3,49,2,4,0,0],
+  [3,4,0,8,25,0,6,15,3,2,0,0],
+  [3,0,0,2,12,1,4,7,1,1,0,0],
+  [3,1,0,1,11,0,4,3,2,0,0,0],
+  [3,1,1,2,2,0,1,12,2,0,0,2],
+  [2,1,0,2,7,0,3,3,1,2,0,0],
+  [2,0,0,0,5,1,2,5,0,1,0,0]
+];
+
+// ─────────────────────────────────────────────────────────────────────────
+// ESTADO
+// ─────────────────────────────────────────────────────────────────────────
+let crmChart  = null;
+let tipoChart = null;
+let liveData  = null;
+let activeTab = 'crm';
+
+// ─────────────────────────────────────────────────────────────────────────
+// DADOS DE DEMONSTRAÇÃO (usados quando a API não está disponível)
+// ─────────────────────────────────────────────────────────────────────────
+const DEMO = {
+  waByTerm: {
+    'fomentarinscricoes-preinscritos26-100626':80,'fomentarinscricoes-pnv-040626':79,
+    'fomentarinscricoes-inscritos2025-070626':77,'fomentarinscricoes-inscritos2025-060626':75,
+    'fomentarinscricoes-pnv-070626':75,'fomentarinscricoes-pnv-050626':68,
+    'fomentarinscricoes-inscritos2025-050626':64,'fomentarinscricoes-pnv-060626':63,
+    'fomentarinscricoes-inscritos2025-040626':60,'fomentarinscricoes-preinscritos2025-040626':50,
+    'fomentarinscricoes-inscritos2024-040626':41,'fomentarinscricoes-inscritos25-080626':41,
+    'fomentarinscricoes-pno-040626':32,'fomentarinscricoes-preinscritos25-040626':30,
+    'fomentarinscricoes-pnv-110626':26,'fomentarinscricoes-pnv-100626':22,
+    'fomentarinscricoes-preinscritos26-090626':20,'fomentarinscricoes-pnv-080626':17,
+    'fomentarinscricoes-inscritos25-090625':13,'fomentarinscricoes-inscritos25-110626':13,
+    'fomentarinscricoes-preinscritos26-050626':12,'fomentarinscricoes-pno-100626':9,
+    'fomentarinscricoes-inscritos25-100626':8,'fomentarinscricoes-pnv-090626':8,
+    'fomentarinscricoes-comunidade-0206':6
+  },
+  emByTerm: {
+    'fomentarinscricoes-basefria-010626':34,'fomentarinscricoes-basequente-010626':31,
+    'fomentarinscricoes-pno-fluxo01':25,'fomentarinscricoes-pno-050626':22,
+    'fomentarinscricoes-030626':20,'fomentarinscricoes-basefria-030626':18,
+    'fomentarinscricoes-basequente-020626':11,'fomentarinscricoes-baseqrcodecargos02-010626':8,
+    'fomentarinscricoes-inscritos24-fluxo01':8,'fomentarinscricoes-preinscrito26-fluxo01':6,
+    'fomentarinscricoes-baseqrcodecargos01-010626':4,'fomentarinscricoes-pno-fluxo02':3
+  },
+  byDay: {
+    '2026-06-01':{wa:1,em:47},'2026-06-02':{wa:6,em:40},'2026-06-03':{wa:0,em:36},
+    '2026-06-04':{wa:247,em:13},'2026-06-05':{wa:144,em:20},'2026-06-06':{wa:136,em:12},
+    '2026-06-07':{wa:144,em:1},'2026-06-08':{wa:84,em:28},'2026-06-09':{wa:57,em:24},
+    '2026-06-10':{wa:124,em:17},'2026-06-11':{wa:58,em:3},'2026-06-12':{wa:0,em:1}
+  },
+  totals: { wa: 994, em: 241, total: 1235, deals: 594 },
+  updatedAt: '2026-06-12T18:00:00.000Z',
+  _isDemo: true
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// CARREGAR DADOS
+// ─────────────────────────────────────────────────────────────────────────
+async function loadData() {
+  const btn = document.getElementById('btnRefresh');
+  btn.classList.add('loading');
+  btn.textContent = '↻ Atualizando…';
+  document.getElementById('status').textContent = 'Buscando dados no HubSpot…';
+
+  try {
+    const res = await fetch('/api/data');
+    if (!res.ok) throw new Error(`Erro ${res.status}`);
+    liveData = await res.json();
+    renderAll(liveData);
+  } catch (e) {
+    // Fora do Vercel (preview local) usa dados da última análise
+    liveData = DEMO;
+    renderAll(liveData);
+    document.getElementById('status').textContent =
+      'Modo demonstração · dados de 12/06/2026 · no Vercel os dados serão ao vivo';
+  } finally {
+    btn.classList.remove('loading');
+    btn.textContent = '↻ Atualizar';
+  }
+}
+
+function renderAll(data) {
+  // Cards
+  document.getElementById('cWA').textContent    = data.totals.wa.toLocaleString('pt-BR');
+  document.getElementById('cEM').textContent    = data.totals.em.toLocaleString('pt-BR');
+  document.getElementById('cTot').textContent   = data.totals.total.toLocaleString('pt-BR');
+  document.getElementById('cDeals').textContent = data.totals.deals.toLocaleString('pt-BR');
+
+  const dt = new Date(data.updatedAt);
+  document.getElementById('status').textContent =
+    'Atualizado em ' + dt.toLocaleDateString('pt-BR') + ' às ' +
+    dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  const terms = buildTerms(data);
+  renderCrmChart(terms);
+  renderTipoChart(terms);
+  renderDiaTable(data.byDay);
+  renderCompTable();
+  renderHeatmap();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CONSTRUIR LISTA DE TERMOS (combina API + dados estáticos de deals)
+// ─────────────────────────────────────────────────────────────────────────
+function buildTerms(data) {
+  const map = {};
+
+  Object.entries(data.waByTerm).forEach(([t, n]) => {
+    map[t] = map[t] || { t, wa: 0, em: 0, d: 0 };
+    map[t].wa = n;
+  });
+  Object.entries(data.emByTerm).forEach(([t, n]) => {
+    map[t] = map[t] || { t, wa: 0, em: 0, d: 0 };
+    map[t].em = n;
+  });
+
+  // Cruzar com dados de negócios (prefixo fomentarinscricoes- ou sem prefixo)
+  CONV.forEach(c => {
+    const full  = 'fomentarinscricoes-' + c.t;
+    const short = c.t;
+    const k = map[full] ? full : (map[short] ? short : null);
+    if (k) map[k].d = c.d;
+  });
+
+  return Object.values(map).sort((a, b) => (b.wa + b.em) - (a.wa + a.em));
+}
+
+function label(t) {
+  return t.replace('fomentarinscricoes-', '');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CHART: CRM CONSOLIDADO
+// ─────────────────────────────────────────────────────────────────────────
+function renderCrmChart(terms) {
+  if (crmChart) { crmChart.destroy(); crmChart = null; }
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const tickColor = isDark ? '#9CA3AF' : '#6B7280';
+
+  const labels = terms.map(x => label(x.t));
+  const totals = terms.map(x => x.wa + x.em);
+  const deals  = terms.map(x => x.d);
+  const colors = terms.map(x => x.em > 0 && x.wa === 0 ? '#185FA5' : '#1D9E75');
+
+  crmChart = new Chart(document.getElementById('cvCrm').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Inscrições',
+          data: totals,
+          backgroundColor: colors,
+          borderRadius: 3,
+          barThickness: 12
+        },
+        {
+          label: 'Negócios TBS School',
+          data: deals,
+          backgroundColor: '#F59E0B',
+          borderRadius: 2,
+          barThickness: 4
+        }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: c => c[0].label,
+            afterBody: c => {
+              const x = terms[c[0].dataIndex];
+              const lines = [];
+              if (x.wa) lines.push('WhatsApp: ' + x.wa);
+              if (x.em) lines.push('Email: ' + x.em);
+              if (x.d)  lines.push('Negócios fechados: ' + x.d);
+              const tot = x.wa + x.em;
+              if (x.d && tot) lines.push('Conversão: ' + (x.d / tot * 100).toFixed(1) + '%');
+              return lines;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 } } },
+        y: { ticks: { color: tickColor, font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CHART: POR TIPO
+// ─────────────────────────────────────────────────────────────────────────
+function renderTipoChart(terms) {
+  if (tipoChart) { tipoChart.destroy(); tipoChart = null; }
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const tickColor = isDark ? '#9CA3AF' : '#6B7280';
+
+  tipoChart = new Chart(document.getElementById('cvTipo').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: terms.map(x => label(x.t)),
+      datasets: [
+        { label: 'WhatsApp', data: terms.map(x => x.wa), backgroundColor: '#1D9E75', barThickness: 12 },
+        { label: 'Email',    data: terms.map(x => x.em), backgroundColor: '#185FA5', barThickness: 12 }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color: tickColor, font: { size: 11 } }
+        }
+      },
+      scales: {
+        x: { stacked: true, grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 } } },
+        y: { stacked: true, ticks: { color: tickColor, font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TABLE: POR DIA
+// ─────────────────────────────────────────────────────────────────────────
+function renderDiaTable(byDay) {
+  const DS = ['dom','seg','ter','qua','qui','sex','sáb'];
+  const sorted = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
+  const maxTot = Math.max(...sorted.map(([, v]) => v.wa + v.em), 1);
+  let acum = 0;
+
+  let h = `<thead><tr>
+    <th>Dia</th>
+    <th></th>
+    <th class="r">WhatsApp</th>
+    <th class="r">Email</th>
+    <th class="r">Total</th>
+    <th class="r">Acumulado</th>
+    <th style="width:30%">Volume</th>
+  </tr></thead><tbody>`;
+
+  sorted.forEach(([date, v]) => {
+    const tot = v.wa + v.em;
+    acum += tot;
+    const dt = new Date(date + 'T12:00:00');
+    const ds = DS[dt.getDay()];
+    const fmt = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const peak = tot === maxTot;
+    const wknd = ds === 'sáb' || ds === 'dom';
+    const wPct = Math.round(v.wa / maxTot * 100);
+    const ePct = Math.round(v.em / maxTot * 100);
+
+    h += `<tr style="${peak ? 'background:var(--bg2)' : ''}">
+      <td style="font-weight:${peak ? 600 : 400};padding-left:0;">${fmt}</td>
+      <td style="font-size:11px;color:${wknd ? '#7F77DD' : 'var(--text3)'};">${ds}</td>
+      <td class="r" style="color:${v.wa ? '#1D9E75' : 'var(--text3)'};">${v.wa || '—'}</td>
+      <td class="r" style="color:${v.em ? '#185FA5' : 'var(--text3)'};">${v.em || '—'}</td>
+      <td class="r" style="font-weight:${peak ? 600 : 500};">${tot}</td>
+      <td class="r" style="color:var(--text2);">${acum.toLocaleString('pt-BR')}</td>
+      <td style="padding-right:0;">
+        <div style="display:flex;height:8px;border-radius:3px;overflow:hidden;gap:1px;">
+          ${v.wa ? `<div style="width:${wPct}%;background:#1D9E75;min-width:2px;"></div>` : ''}
+          ${v.em ? `<div style="width:${ePct}%;background:#185FA5;min-width:2px;"></div>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  });
+
+  const tWA = sorted.reduce((s, [, v]) => s + v.wa, 0);
+  const tEM = sorted.reduce((s, [, v]) => s + v.em, 0);
+  h += `<tr>
+    <td colspan="2" style="font-weight:500;color:var(--text2);padding-left:0;border-top:1px solid var(--border);">Total</td>
+    <td class="r" style="font-weight:500;color:#1D9E75;border-top:1px solid var(--border);">${tWA.toLocaleString('pt-BR')}</td>
+    <td class="r" style="font-weight:500;color:#185FA5;border-top:1px solid var(--border);">${tEM.toLocaleString('pt-BR')}</td>
+    <td class="r" style="font-weight:600;border-top:1px solid var(--border);">${(tWA + tEM).toLocaleString('pt-BR')}</td>
+    <td colspan="2" style="border-top:1px solid var(--border);"></td>
+  </tr>`;
+
+  document.getElementById('divDia').innerHTML = '<table>' + h + '</tbody></table>';
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TABLE: COMPRAS
+// ─────────────────────────────────────────────────────────────────────────
+function renderCompTable() {
+  const rows = [...CONV].sort((a, b) => {
+    const ra = a.insc ? a.d / a.insc : 0;
+    const rb = b.insc ? b.d / b.insc : 0;
+    return rb - ra;
+  });
+  const maxPct = Math.max(...rows.map(r => r.insc ? r.d / r.insc : 0));
+
+  let h = `<thead><tr>
+    <th>utm_term_tbs</th>
+    <th>Canal</th>
+    <th class="r">Inscrições</th>
+    <th class="r">Negócios</th>
+    <th style="width:35%">Conversão</th>
+  </tr></thead><tbody>`;
+
+  rows.forEach(r => {
+    const pct = r.insc ? r.d / r.insc * 100 : 0;
+    const barColor = pct >= 40 ? '#0F6E56' : pct >= 20 ? '#1D9E75' : pct >= 10 ? '#5DCAA5' : '#9FE1CB';
+    const chC = r.ch === 'WA' ? '#1D9E75' : '#185FA5';
+    const barW = maxPct > 0 ? Math.round(pct / maxPct * 100) : 0;
+
+    h += `<tr>
+      <td style="padding-left:0;">${r.t}</td>
+      <td><span class="badge" style="background:${chC}22;color:${chC};">${r.ch}</span></td>
+      <td class="r" style="color:var(--text2);">${r.insc}</td>
+      <td class="r" style="font-weight:${r.d > 0 ? 500 : 400};color:${r.d > 0 ? 'var(--text)' : 'var(--text3)'};">${r.d}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="flex:1;background:var(--bg2);border-radius:3px;height:6px;overflow:hidden;">
+            <div style="width:${barW}%;height:100%;background:${barColor};border-radius:3px;"></div>
+          </div>
+          <span style="font-size:12px;font-weight:500;min-width:38px;text-align:right;">${pct.toFixed(1)}%</span>
+        </div>
+      </td>
+    </tr>`;
+  });
+
+  document.getElementById('tblComp').innerHTML = h + '</tbody>';
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TABLE: HEATMAP
+// ─────────────────────────────────────────────────────────────────────────
+function renderHeatmap() {
+  function bg(v) {
+    if (!v) return 'transparent';
+    if (v >= 61) return '#0F6E56';
+    if (v >= 26) return '#1D9E75';
+    if (v >= 11) return '#5DCAA5';
+    if (v >= 4)  return '#9FE1CB';
+    return '#E1F5EE';
+  }
+  function fg(v) { return v >= 26 ? '#fff' : '#085041'; }
+
+  const rT = HBASES.map((_, bi) => H.reduce((s, r) => s + r[bi], 0));
+  const cT = Array.from({ length: 24 }, (_, h) => H[h].reduce((s, v) => s + v, 0));
+  const si  = [...HBASES.keys()].sort((a, b) => rT[b] - rT[a]);
+
+  let html = `<thead><tr>
+    <th style="min-width:120px;font-size:10px;padding-left:0;">Base</th>`;
+  for (let h = 0; h < 24; h++) {
+    const hot = [9,11,13,17].includes(h);
+    html += `<th style="text-align:center;font-size:9px;min-width:18px;font-weight:${hot?500:400};color:${hot?'var(--text)':'var(--text3)'};">${h}h</th>`;
+  }
+  html += '<th style="text-align:right;font-size:10px;min-width:36px;">Total</th></tr></thead><tbody>';
+
+  si.forEach(bi => {
+    html += `<tr>
+      <td style="padding-left:0;white-space:nowrap;">
+        <span style="font-size:10.5px;">${HBASES[bi]}</span>
+        <span class="badge" style="background:${HCOL[bi]}22;color:${HCOL[bi]};margin-left:4px;font-size:8.5px;">${HCHAN[bi]}</span>
+      </td>`;
+    for (let h = 0; h < 24; h++) {
+      const v = H[h][bi];
+      html += `<td style="background:${bg(v)};text-align:center;border-radius:2px;font-size:8px;color:${fg(v)};font-weight:500;padding:3px 0;">${v || ''}</td>`;
+    }
+    html += `<td style="text-align:right;font-size:10px;font-weight:500;">${rT[bi]}</td></tr>`;
+  });
+
+  html += `</tbody><tfoot><tr>
+    <td style="font-size:10px;font-weight:500;color:var(--text2);padding-left:0;border-top:1px solid var(--border);">Total/hora</td>`;
+  cT.forEach(ct => {
+    html += `<td style="text-align:center;font-size:9px;font-weight:${ct >= 80 ? 500 : 400};color:${ct >= 80 ? 'var(--text)' : 'var(--text2)'};border-top:1px solid var(--border);">${ct || ''}</td>`;
+  });
+  html += `<td style="text-align:right;font-size:10px;font-weight:500;border-top:1px solid var(--border);">${cT.reduce((a,b)=>a+b,0)}</td></tr></tfoot>`;
+
+  document.getElementById('tblHeat').innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TROCAR ABA
+// ─────────────────────────────────────────────────────────────────────────
+function setTab(t) {
+  ['crm','tipo','dia','comp','heat'].forEach(id => {
+    document.getElementById('tab-' + id).style.display = id === t ? 'block' : 'none';
+    document.getElementById('btn-' + id).className     = id === t ? 'tab-btn active' : 'tab-btn';
+  });
+  activeTab = t;
+
+  if (liveData) {
+    const terms = buildTerms(liveData);
+    if (t === 'crm')  renderCrmChart(terms);
+    if (t === 'tipo') renderTipoChart(terms);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// INICIALIZAR
+// ─────────────────────────────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
