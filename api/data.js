@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=60');
+  res.setHeader('Cache-Control', 'no-store');
 
   const token = process.env.HUBSPOT_TOKEN;
   if (!token) {

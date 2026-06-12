@@ -565,7 +565,7 @@ async function loadData() {
 
   loadSavedMetrics();
   try {
-    const res = await fetch('/api/data');
+    const res = await fetch('/api/data?_=' + Date.now(), { cache: 'no-store' });
     if (!res.ok) throw new Error(`Erro ${res.status}`);
     liveData = await res.json();
     if (!liveData.byDayByTerm) liveData.byDayByTerm = buildDemoByDayByTerm(liveData);
@@ -600,12 +600,11 @@ function renderAll(data) {
   }
   document.getElementById('cDeals').textContent = data.totals.deals.toLocaleString('pt-BR');
 
-  if (!filterStart && !filterEnd) {
-    const dt = new Date(data.updatedAt);
-    document.getElementById('status').textContent =
-      'Atualizado em ' + dt.toLocaleDateString('pt-BR') + ' às ' +
-      dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
-  }
+  const dt = new Date(data.updatedAt);
+  document.getElementById('status').textContent =
+    'Atualizado em ' + dt.toLocaleDateString('pt-BR') + ' às ' +
+    dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) +
+    (data._isDemo ? ' · modo demonstração' : '');
 
   renderCrmChart(terms);
   renderWaChart(terms);
