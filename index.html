@@ -7,23 +7,14 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg:     #FFFFFF;
-      --bg2:    #F7F8FA;
-      --border: #E5E7EB;
-      --text:   #111827;
-      --text2:  #6B7280;
-      --text3:  #9CA3AF;
+      --bg:     #0E0E14;
+      --bg2:    #1A1A24;
+      --border: #2A2A38;
+      --text:   #F3F4F6;
+      --text2:  #9CA3AF;
+      --text3:  #4B5563;
+      --accent: #F08220;
       --r:      8px;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg:     #0F0F0F;
-        --bg2:    #1A1A1A;
-        --border: #2C2C2C;
-        --text:   #F3F4F6;
-        --text2:  #9CA3AF;
-        --text3:  #4B5563;
-      }
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -32,6 +23,8 @@
       min-height: 100vh;
     }
     .wrap { max-width: 960px; margin: 0 auto; padding: 28px 20px 60px; }
+
+    /* ── HEADER ── */
     .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
     h1 { font-size: 17px; font-weight: 600; margin-bottom: 3px; }
     .status { font-size: 11.5px; color: var(--text3); }
@@ -45,62 +38,86 @@
     .btn-refresh.loading { opacity: 0.5; pointer-events: none; }
 
     /* ── CARDS ── */
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-bottom: 20px;
-    }
+    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
     @media (max-width: 600px) { .cards { grid-template-columns: repeat(2, 1fr); } }
-    .card {
-      background: var(--bg2);
-      border-radius: var(--r);
-      padding: 14px 16px;
-    }
+    .card { background: var(--bg2); border-radius: var(--r); padding: 14px 16px; }
     .card-label { font-size: 10.5px; color: var(--text2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .4px; }
-    .card-value { font-size: 26px; font-weight: 500; line-height: 1; }
-    .card-sub   { font-size: 10px; color: var(--text3); margin-top: 4px; }
+    .card-value { font-size: 26px; font-weight: 500; line-height: 1; color: var(--accent); }
+    .card-sub { font-size: 10px; color: var(--text3); margin-top: 4px; }
+
+    /* ── FILTER BAR ── */
+    .filter-bar {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      background: var(--bg2); border-radius: var(--r);
+      padding: 10px 14px; margin-bottom: 16px;
+    }
+    .filter-lbl { font-size: 11.5px; color: var(--text2); white-space: nowrap; }
+    .filter-bar input[type=date] {
+      background: var(--bg); border: 0.5px solid var(--border); border-radius: 6px;
+      color: var(--text); padding: 5px 8px; font-size: 12px; cursor: pointer; outline: none;
+    }
+    .filter-bar input[type=date]::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+    .filter-bar input[type=date]:focus { border-color: var(--accent); }
+    .filter-sep { font-size: 11px; color: var(--text3); }
+    .btn-filt {
+      padding: 5px 13px; font-size: 12px; border-radius: 6px; cursor: pointer;
+      border: none; background: var(--accent); color: var(--bg); font-weight: 500; transition: opacity .15s;
+    }
+    .btn-filt:hover { opacity: .85; }
+    .btn-clr {
+      padding: 5px 10px; font-size: 12px; border-radius: 6px; cursor: pointer;
+      border: 0.5px solid var(--border); background: transparent; color: var(--text2); transition: background .15s;
+    }
+    .btn-clr:hover { background: var(--bg); }
+    .filter-active { font-size: 11px; color: var(--accent); }
 
     /* ── TABS ── */
     .nav {
       display: flex; flex-wrap: wrap;
-      border: 0.5px solid var(--border);
-      border-radius: var(--r);
-      overflow: hidden;
-      width: fit-content;
-      margin-bottom: 16px;
+      border: 0.5px solid var(--border); border-radius: var(--r);
+      overflow: hidden; width: fit-content; margin-bottom: 16px;
     }
     .tab-btn {
-      padding: 8px 15px; font-size: 12.5px;
-      border: none; cursor: pointer;
-      background: transparent; color: var(--text2);
-      white-space: nowrap;
+      padding: 8px 15px; font-size: 12.5px; border: none; cursor: pointer;
+      background: transparent; color: var(--text2); white-space: nowrap; transition: background .15s, color .15s;
     }
-    .tab-btn.active { background: var(--text); color: var(--bg); }
+    .tab-btn.active { background: var(--accent); color: var(--bg); font-weight: 500; }
     .tab-btn + .tab-btn { border-left: 0.5px solid var(--border); }
 
     /* ── CHART ── */
-    .chart-wrap { height: 660px; position: relative; }
+    .chart-wrap { position: relative; }
+
+    /* ── PAGER ── */
+    .pager {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 10px;
+      border-top: 0.5px solid var(--border);
+    }
+    .pager-l { display: flex; align-items: center; gap: 5px; }
+    .pager-r { display: flex; align-items: center; gap: 3px; }
+    .pager-info { font-size: 11.5px; color: var(--text2); }
+    .psz-btn, .pg-btn {
+      padding: 4px 9px; font-size: 11.5px; cursor: pointer;
+      border: 0.5px solid var(--border); border-radius: 5px;
+      background: transparent; color: var(--text2); transition: all .12s;
+    }
+    .psz-btn:hover { background: var(--bg2); }
+    .pg-btn:hover:not(:disabled) { background: var(--bg2); }
+    .psz-btn.on, .pg-btn.on { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 500; }
+    .pg-btn:disabled { opacity: 0.25; cursor: default; }
+    .pager-dot { font-size: 11px; color: var(--text3); padding: 0 2px; }
 
     /* ── TABLE ── */
     table { width: 100%; border-collapse: collapse; }
     th {
       text-align: left; padding: 6px 8px 9px;
       font-size: 11px; font-weight: 500; color: var(--text2);
-      border-bottom: 0.5px solid var(--border);
-      white-space: nowrap;
+      border-bottom: 0.5px solid var(--border); white-space: nowrap;
     }
     th.r, td.r { text-align: right; }
     td { padding: 8px; font-size: 12.5px; border-bottom: 0.5px solid var(--border); }
     td:first-child, th:first-child { padding-left: 0; }
-
-    .badge {
-      display: inline-block;
-      font-size: 10px; padding: 2px 6px;
-      border-radius: 3px; white-space: nowrap;
-    }
-
-    /* ── NOTA ── */
+    .badge { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
     .nota { font-size: 11px; color: var(--text3); margin-bottom: 12px; }
   </style>
 </head>
@@ -138,6 +155,17 @@
     </div>
   </div>
 
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <span class="filter-lbl">Período:</span>
+    <input type="date" id="dateStart">
+    <span class="filter-sep">→</span>
+    <input type="date" id="dateEnd">
+    <button class="btn-filt" onclick="applyFilter()">Filtrar</button>
+    <button class="btn-clr" id="btnClr" style="display:none" onclick="clearFilter()">✕ Limpar</button>
+    <span class="filter-active" id="filterLbl"></span>
+  </div>
+
   <div class="nav">
     <button class="tab-btn active" id="btn-crm"  onclick="setTab('crm')">CRM Consolidado</button>
     <button class="tab-btn"        id="btn-wa"   onclick="setTab('wa')">WhatsApp</button>
@@ -150,37 +178,44 @@
   <!-- CRM Consolidado -->
   <div id="tab-crm">
     <p class="nota">Inscrições por utm_term_tbs · verde = WhatsApp · azul = Email · amarelo = negócios The Best School</p>
-    <div class="chart-wrap"><canvas id="cvCrm"></canvas></div>
+    <div id="wrapCrm" class="chart-wrap"><canvas id="cvCrm"></canvas></div>
+    <div id="pgCrm"></div>
   </div>
 
   <!-- WhatsApp -->
-  <div id="tab-wa" style="display:none;">
+  <div id="tab-wa" style="display:none">
     <p class="nota">Inscrições via WhatsApp por disparo · amarelo = negócios The Best School</p>
     <div id="wrapWA" class="chart-wrap"><canvas id="cvWA"></canvas></div>
+    <div id="pgWA"></div>
   </div>
 
   <!-- Email -->
-  <div id="tab-em" style="display:none;">
+  <div id="tab-em" style="display:none">
     <p class="nota">Inscrições via Email por disparo · amarelo = negócios The Best School</p>
     <div id="wrapEM" class="chart-wrap"><canvas id="cvEM"></canvas></div>
+    <div id="pgEM"></div>
   </div>
 
   <!-- Por dia -->
-  <div id="tab-dia" style="display:none;">
-    <div id="divDia"><p class="nota">Carregando…</p></div>
+  <div id="tab-dia" style="display:none">
+    <p class="nota">Inscrições por dia · verde = WhatsApp · azul = Email</p>
+    <div class="chart-wrap" style="height:200px;margin-bottom:20px"><canvas id="cvDia"></canvas></div>
+    <div id="divDia"></div>
+    <div id="pgDia"></div>
   </div>
 
   <!-- Compras -->
-  <div id="tab-comp" style="display:none;">
+  <div id="tab-comp" style="display:none">
     <p class="nota">Conversão para The Best School · dados de análise de 12/06/2026</p>
     <table id="tblComp"></table>
+    <div id="pgComp"></div>
   </div>
 
   <!-- Heatmap -->
-  <div id="tab-heat" style="display:none;">
+  <div id="tab-heat" style="display:none">
     <p class="nota">Inscrições por hora (BRT) × base de contatos · dados de análise de 12/06/2026</p>
-    <div style="overflow-x:auto;">
-      <table id="tblHeat" style="font-size:10.5px;"></table>
+    <div style="overflow-x:auto">
+      <table id="tblHeat" style="font-size:10.5px"></table>
     </div>
   </div>
 
@@ -189,10 +224,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 // ─────────────────────────────────────────────────────────────────────────
-// DADOS ESTÁTICOS (análise de 12/06/2026 — compras + heatmap)
+// DADOS ESTÁTICOS
 // ─────────────────────────────────────────────────────────────────────────
 const CONV = [
-  // Email
   {t:'basefria-030626',          ch:'Email', insc:18,  d:10},
   {t:'basequente-010626',        ch:'Email', insc:31,  d:14},
   {t:'basequente-020626',        ch:'Email', insc:11,  d:3},
@@ -205,75 +239,60 @@ const CONV = [
   {t:'030626',                   ch:'Email', insc:20,  d:2},
   {t:'inscritos24-fluxo01',      ch:'Email', insc:8,   d:0},
   {t:'pno-fluxo02',              ch:'Email', insc:3,   d:0},
-  // WhatsApp
-  {t:'preinscritos26-090626',    ch:'WA',   insc:20,  d:11},
-  {t:'preinscritos26-100626',    ch:'WA',   insc:80,  d:24},
-  {t:'pnv-040626',               ch:'WA',   insc:79,  d:16},
-  {t:'pnv-060626',               ch:'WA',   insc:63,  d:16},
-  {t:'pnv-070626',               ch:'WA',   insc:75,  d:14},
-  {t:'preinscritos2025-040626',  ch:'WA',   insc:50,  d:13},
-  {t:'pnv-050626',               ch:'WA',   insc:68,  d:11},
-  {t:'inscritos2025-040626',     ch:'WA',   insc:60,  d:15},
-  {t:'inscritos2025-070626',     ch:'WA',   insc:77,  d:5},
-  {t:'inscritos2025-060626',     ch:'WA',   insc:75,  d:10},
-  {t:'inscritos2025-050626',     ch:'WA',   insc:64,  d:6},
-  {t:'inscritos25-080626',       ch:'WA',   insc:41,  d:3},
-  {t:'inscritos2024-040626',     ch:'WA',   insc:41,  d:3},
-  {t:'inscritos25-090625',       ch:'WA',   insc:13,  d:3},
-  {t:'pno-040626',               ch:'WA',   insc:32,  d:3},
-  {t:'pnv-110626',               ch:'WA',   insc:26,  d:4},
-  {t:'pnv-100626',               ch:'WA',   insc:22,  d:3},
-  {t:'pnv-080626',               ch:'WA',   insc:17,  d:1},
-  {t:'inscritos25-110626',       ch:'WA',   insc:13,  d:1},
-  {t:'preinscritos25-040626',    ch:'WA',   insc:30,  d:2},
-  {t:'preinscritos26-050626',    ch:'WA',   insc:12,  d:2},
-  {t:'pno-100626',               ch:'WA',   insc:9,   d:1},
-  {t:'comunidade-0206',          ch:'WA',   insc:6,   d:1},
-  {t:'inscritos25-100626',       ch:'WA',   insc:8,   d:0},
-  {t:'pnv-090626',               ch:'WA',   insc:8,   d:0},
+  {t:'preinscritos26-090626',    ch:'WA',    insc:20,  d:11},
+  {t:'preinscritos26-100626',    ch:'WA',    insc:80,  d:24},
+  {t:'pnv-040626',               ch:'WA',    insc:79,  d:16},
+  {t:'pnv-060626',               ch:'WA',    insc:63,  d:16},
+  {t:'pnv-070626',               ch:'WA',    insc:75,  d:14},
+  {t:'preinscritos2025-040626',  ch:'WA',    insc:50,  d:13},
+  {t:'pnv-050626',               ch:'WA',    insc:68,  d:11},
+  {t:'inscritos2025-040626',     ch:'WA',    insc:60,  d:15},
+  {t:'inscritos2025-070626',     ch:'WA',    insc:77,  d:5},
+  {t:'inscritos2025-060626',     ch:'WA',    insc:75,  d:10},
+  {t:'inscritos2025-050626',     ch:'WA',    insc:64,  d:6},
+  {t:'inscritos25-080626',       ch:'WA',    insc:41,  d:3},
+  {t:'inscritos2024-040626',     ch:'WA',    insc:41,  d:3},
+  {t:'inscritos25-090625',       ch:'WA',    insc:13,  d:3},
+  {t:'pno-040626',               ch:'WA',    insc:32,  d:3},
+  {t:'pnv-110626',               ch:'WA',    insc:26,  d:4},
+  {t:'pnv-100626',               ch:'WA',    insc:22,  d:3},
+  {t:'pnv-080626',               ch:'WA',    insc:17,  d:1},
+  {t:'inscritos25-110626',       ch:'WA',    insc:13,  d:1},
+  {t:'preinscritos25-040626',    ch:'WA',    insc:30,  d:2},
+  {t:'preinscritos26-050626',    ch:'WA',    insc:12,  d:2},
+  {t:'pno-100626',               ch:'WA',    insc:9,   d:1},
+  {t:'comunidade-0206',          ch:'WA',    insc:6,   d:1},
+  {t:'inscritos25-100626',       ch:'WA',    insc:8,   d:0},
+  {t:'pnv-090626',               ch:'WA',    insc:8,   d:0},
 ];
 
 const HBASES = ['Base Fria','Base Quente','Comunidade','Inscritos 2024','Inscritos 2025','Outros','PNO','PNV','Pré-insc. 25','Pré-insc. 26','QR Code','QR Cargos'];
 const HCHAN  = ['Email','Email','WA','WA·Auto','WA','Email','WA·Auto·Em','WA','WA','WA·Auto','WA','Email'];
 const HCOL   = ['#185FA5','#185FA5','#1D9E75','#7F77DD','#1D9E75','#185FA5','#7F77DD','#1D9E75','#1D9E75','#7F77DD','#1D9E75','#185FA5'];
 const H = [
-  [1,0,0,1,2,1,1,1,1,0,0,0],
-  [2,0,0,0,0,1,1,2,0,0,0,0],
-  [0,1,0,0,0,0,0,0,0,1,0,0],
-  [0,0,0,0,0,0,1,0,0,0,0,0],
-  [0,0,0,0,1,0,1,0,0,1,0,0],
-  [0,0,0,1,3,0,0,1,0,0,0,0],
-  [0,1,0,0,2,0,0,1,1,1,0,0],
-  [2,0,0,3,4,0,2,2,2,0,0,0],
-  [1,1,0,1,3,0,1,3,0,0,0,0],
-  [2,5,0,1,8,3,7,4,0,28,0,1],
-  [4,3,2,1,6,4,5,6,2,0,0,0],
-  [1,1,2,1,29,5,2,10,19,0,0,1],
-  [0,1,1,2,14,1,14,9,14,0,0,0],
-  [2,0,1,0,73,1,4,97,8,6,0,0],
-  [0,2,0,0,22,1,4,26,3,5,1,2],
-  [3,5,0,0,10,1,3,18,4,1,1,2],
-  [5,4,1,18,18,1,10,6,2,5,0,2],
-  [2,1,0,6,59,0,3,49,2,4,0,0],
-  [3,4,0,8,25,0,6,15,3,2,0,0],
-  [3,0,0,2,12,1,4,7,1,1,0,0],
-  [3,1,0,1,11,0,4,3,2,0,0,0],
-  [3,1,1,2,2,0,1,12,2,0,0,2],
-  [2,1,0,2,7,0,3,3,1,2,0,0],
-  [2,0,0,0,5,1,2,5,0,1,0,0]
+  [1,0,0,1,2,1,1,1,1,0,0,0],[2,0,0,0,0,1,1,2,0,0,0,0],[0,1,0,0,0,0,0,0,0,1,0,0],
+  [0,0,0,0,0,0,1,0,0,0,0,0],[0,0,0,0,1,0,1,0,0,1,0,0],[0,0,0,1,3,0,0,1,0,0,0,0],
+  [0,1,0,0,2,0,0,1,1,1,0,0],[2,0,0,3,4,0,2,2,2,0,0,0],[1,1,0,1,3,0,1,3,0,0,0,0],
+  [2,5,0,1,8,3,7,4,0,28,0,1],[4,3,2,1,6,4,5,6,2,0,0,0],[1,1,2,1,29,5,2,10,19,0,0,1],
+  [0,1,1,2,14,1,14,9,14,0,0,0],[2,0,1,0,73,1,4,97,8,6,0,0],[0,2,0,0,22,1,4,26,3,5,1,2],
+  [3,5,0,0,10,1,3,18,4,1,1,2],[5,4,1,18,18,1,10,6,2,5,0,2],[2,1,0,6,59,0,3,49,2,4,0,0],
+  [3,4,0,8,25,0,6,15,3,2,0,0],[3,0,0,2,12,1,4,7,1,1,0,0],[3,1,0,1,11,0,4,3,2,0,0,0],
+  [3,1,1,2,2,0,1,12,2,0,0,2],[2,1,0,2,7,0,3,3,1,2,0,0],[2,0,0,0,5,1,2,5,0,1,0,0]
 ];
 
 // ─────────────────────────────────────────────────────────────────────────
 // ESTADO
 // ─────────────────────────────────────────────────────────────────────────
-let crmChart = null;
-let waChart  = null;
-let emChart  = null;
-let liveData  = null;
+let crmChart = null, waChart = null, emChart = null, diaChart = null;
+let liveData = null;
 let activeTab = 'crm';
+const PAGE = { crm:1, wa:1, em:1, dia:1, comp:1 };
+let pageSize = 10;
+let filterStart = null;
+let filterEnd   = null;
 
 // ─────────────────────────────────────────────────────────────────────────
-// DADOS DE DEMONSTRAÇÃO (usados quando a API não está disponível)
+// DEMO DATA
 // ─────────────────────────────────────────────────────────────────────────
 const DEMO = {
   waByTerm: {
@@ -305,10 +324,170 @@ const DEMO = {
     '2026-06-07':{wa:144,em:1},'2026-06-08':{wa:84,em:28},'2026-06-09':{wa:57,em:24},
     '2026-06-10':{wa:124,em:17},'2026-06-11':{wa:58,em:3},'2026-06-12':{wa:0,em:1}
   },
-  totals: { wa: 994, em: 241, total: 1235, deals: 594 },
+  totals: { wa:994, em:241, total:1235, deals:594 },
   updatedAt: '2026-06-12T18:00:00.000Z',
   _isDemo: true
 };
+
+// ─────────────────────────────────────────────────────────────────────────
+// UTILITÁRIOS DE DATA
+// ─────────────────────────────────────────────────────────────────────────
+function parseTermDate(t) {
+  const m = t.match(/(\d{2})(\d{2})(\d{2})$/);
+  if (!m) return null;
+  return `20${m[3]}-${m[2]}-${m[1]}`;
+}
+
+function fmtDate(iso) {
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function buildDemoByDayByTerm(data) {
+  const r = {};
+  Object.entries(data.waByTerm).forEach(([t, n]) => {
+    const date = parseTermDate(t.replace('fomentarinscricoes-', ''));
+    if (!date) return;
+    r[date] = r[date] || { wa:{}, em:{} };
+    r[date].wa[t] = n;
+  });
+  Object.entries(data.emByTerm).forEach(([t, n]) => {
+    const date = parseTermDate(t.replace('fomentarinscricoes-', ''));
+    if (!date) return;
+    r[date] = r[date] || { wa:{}, em:{} };
+    r[date].em[t] = n;
+  });
+  return r;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// FILTROS DE PERÍODO
+// ─────────────────────────────────────────────────────────────────────────
+function applyFilter() {
+  const s = document.getElementById('dateStart').value;
+  const e = document.getElementById('dateEnd').value;
+  if (!s && !e) { clearFilter(); return; }
+  filterStart = s || null;
+  filterEnd   = e || null;
+  document.getElementById('btnClr').style.display = '';
+  const parts = [];
+  if (filterStart) parts.push(fmtDate(filterStart));
+  if (filterEnd)   parts.push(fmtDate(filterEnd));
+  document.getElementById('filterLbl').textContent =
+    parts.length === 2 ? `${parts[0]} – ${parts[1]}` : parts[0];
+  resetPages();
+  if (liveData) renderAll(liveData);
+}
+
+function clearFilter() {
+  filterStart = filterEnd = null;
+  document.getElementById('dateStart').value = '';
+  document.getElementById('dateEnd').value   = '';
+  document.getElementById('btnClr').style.display = 'none';
+  document.getElementById('filterLbl').textContent = '';
+  resetPages();
+  if (liveData) renderAll(liveData);
+}
+
+function resetPages() { Object.keys(PAGE).forEach(k => PAGE[k] = 1); }
+
+function filteredByDay(data) {
+  if (!filterStart && !filterEnd) return data.byDay;
+  const out = {};
+  Object.entries(data.byDay).forEach(([day, v]) => {
+    if (filterStart && day < filterStart) return;
+    if (filterEnd   && day > filterEnd)   return;
+    out[day] = v;
+  });
+  return out;
+}
+
+function filteredTerms(data) {
+  if (!filterStart && !filterEnd) return buildTerms(data);
+  const bdt = data.byDayByTerm || {};
+  const wa = {}, em = {};
+  Object.entries(bdt).forEach(([day, v]) => {
+    if (filterStart && day < filterStart) return;
+    if (filterEnd   && day > filterEnd)   return;
+    Object.entries(v.wa || {}).forEach(([t, n]) => wa[t] = (wa[t] || 0) + n);
+    Object.entries(v.em || {}).forEach(([t, n]) => em[t] = (em[t] || 0) + n);
+  });
+  return buildTerms({ waByTerm: wa, emByTerm: em });
+}
+
+function filteredConv() {
+  if (!filterStart && !filterEnd) return [...CONV];
+  return CONV.filter(c => {
+    const date = parseTermDate(c.t);
+    if (!date) return true;
+    if (filterStart && date < filterStart) return false;
+    if (filterEnd   && date > filterEnd)   return false;
+    return true;
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// PAGINAÇÃO
+// ─────────────────────────────────────────────────────────────────────────
+function setPageSize(n) {
+  pageSize = n;
+  resetPages();
+  if (liveData) reRenderTab();
+}
+
+function goPage(tab, p) {
+  PAGE[tab] = p;
+  if (liveData) reRenderTab();
+}
+
+function reRenderTab() {
+  const terms = filteredTerms(liveData);
+  const byday = filteredByDay(liveData);
+  if (activeTab === 'crm')  renderCrmChart(terms);
+  if (activeTab === 'wa')   renderWaChart(terms);
+  if (activeTab === 'em')   renderEmChart(terms);
+  if (activeTab === 'dia')  { renderDiaChart(byday); renderDiaTable(byday); }
+  if (activeTab === 'comp') renderCompTable();
+}
+
+function buildPager(elId, tab, total) {
+  const el = document.getElementById(elId);
+  if (!el || total === 0) { if (el) el.innerHTML = ''; return; }
+  const pages = Math.ceil(total / pageSize);
+  const cur   = PAGE[tab];
+
+  const szBtns = [10, 20, 30].map(n =>
+    `<button class="psz-btn${pageSize===n?' on':''}" onclick="setPageSize(${n})">${n}</button>`
+  ).join('');
+
+  let pgBtns = `<button class="pg-btn" onclick="goPage('${tab}',${cur-1})" ${cur<=1?'disabled':''}>‹</button>`;
+
+  const lo = Math.max(1, cur - 2);
+  const hi = Math.min(pages, lo + 4);
+
+  if (lo > 1) { pgBtns += `<button class="pg-btn" onclick="goPage('${tab}',1)">1</button>`; if (lo > 2) pgBtns += `<span class="pager-dot">…</span>`; }
+  for (let i = lo; i <= hi; i++) pgBtns += `<button class="pg-btn${i===cur?' on':''}" onclick="goPage('${tab}',${i})">${i}</button>`;
+  if (hi < pages) { if (hi < pages-1) pgBtns += `<span class="pager-dot">…</span>`; pgBtns += `<button class="pg-btn" onclick="goPage('${tab}',${pages})">${pages}</button>`; }
+
+  pgBtns += `<button class="pg-btn" onclick="goPage('${tab}',${cur+1})" ${cur>=pages?'disabled':''}>›</button>`;
+
+  const from = Math.min((cur-1)*pageSize + 1, total);
+  const to   = Math.min(cur*pageSize, total);
+
+  el.innerHTML = `<div class="pager">
+    <div class="pager-l">
+      <span class="pager-info">Linhas:</span>${szBtns}
+      <span class="pager-dot">·</span>
+      <span class="pager-info">${from}–${to} de ${total}</span>
+    </div>
+    <div class="pager-r">${pgBtns}</div>
+  </div>`;
+}
+
+function slicePage(arr, tab) {
+  const p = PAGE[tab];
+  return arr.slice((p-1)*pageSize, p*pageSize);
+}
 
 // ─────────────────────────────────────────────────────────────────────────
 // CARREGAR DADOS
@@ -323,10 +502,11 @@ async function loadData() {
     const res = await fetch('/api/data');
     if (!res.ok) throw new Error(`Erro ${res.status}`);
     liveData = await res.json();
+    if (!liveData.byDayByTerm) liveData.byDayByTerm = buildDemoByDayByTerm(liveData);
     renderAll(liveData);
   } catch (e) {
-    // Fora do Vercel (preview local) usa dados da última análise
     liveData = DEMO;
+    liveData.byDayByTerm = buildDemoByDayByTerm(liveData);
     renderAll(liveData);
     document.getElementById('status').textContent =
       'Modo demonstração · dados de 12/06/2026 · no Vercel os dados serão ao vivo';
@@ -337,322 +517,310 @@ async function loadData() {
 }
 
 function renderAll(data) {
-  // Cards
-  document.getElementById('cWA').textContent    = data.totals.wa.toLocaleString('pt-BR');
-  document.getElementById('cEM').textContent    = data.totals.em.toLocaleString('pt-BR');
-  document.getElementById('cTot').textContent   = data.totals.total.toLocaleString('pt-BR');
+  const byday = filteredByDay(data);
+  const terms = filteredTerms(data);
+
+  // Cards (filtrados por data quando aplicável)
+  if (filterStart || filterEnd) {
+    const wa  = Object.values(byday).reduce((s, v) => s + v.wa, 0);
+    const em  = Object.values(byday).reduce((s, v) => s + v.em, 0);
+    document.getElementById('cWA').textContent  = wa.toLocaleString('pt-BR');
+    document.getElementById('cEM').textContent  = em.toLocaleString('pt-BR');
+    document.getElementById('cTot').textContent = (wa + em).toLocaleString('pt-BR');
+  } else {
+    document.getElementById('cWA').textContent  = data.totals.wa.toLocaleString('pt-BR');
+    document.getElementById('cEM').textContent  = data.totals.em.toLocaleString('pt-BR');
+    document.getElementById('cTot').textContent = data.totals.total.toLocaleString('pt-BR');
+  }
   document.getElementById('cDeals').textContent = data.totals.deals.toLocaleString('pt-BR');
 
-  const dt = new Date(data.updatedAt);
-  document.getElementById('status').textContent =
-    'Atualizado em ' + dt.toLocaleDateString('pt-BR') + ' às ' +
-    dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  if (!filterStart && !filterEnd) {
+    const dt = new Date(data.updatedAt);
+    document.getElementById('status').textContent =
+      'Atualizado em ' + dt.toLocaleDateString('pt-BR') + ' às ' +
+      dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+  }
 
-  const terms = buildTerms(data);
   renderCrmChart(terms);
   renderWaChart(terms);
   renderEmChart(terms);
-  renderDiaTable(data.byDay);
+  renderDiaChart(byday);
+  renderDiaTable(byday);
   renderCompTable();
   renderHeatmap();
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// CONSTRUIR LISTA DE TERMOS (combina API + dados estáticos de deals)
+// BUILD TERMS
 // ─────────────────────────────────────────────────────────────────────────
 function buildTerms(data) {
   const map = {};
-
-  Object.entries(data.waByTerm).forEach(([t, n]) => {
-    map[t] = map[t] || { t, wa: 0, em: 0, d: 0 };
+  Object.entries(data.waByTerm || {}).forEach(([t, n]) => {
+    map[t] = map[t] || { t, wa:0, em:0, d:0 };
     map[t].wa = n;
   });
-  Object.entries(data.emByTerm).forEach(([t, n]) => {
-    map[t] = map[t] || { t, wa: 0, em: 0, d: 0 };
+  Object.entries(data.emByTerm || {}).forEach(([t, n]) => {
+    map[t] = map[t] || { t, wa:0, em:0, d:0 };
     map[t].em = n;
   });
-
-  // Cruzar com dados de negócios (prefixo fomentarinscricoes- ou sem prefixo)
   CONV.forEach(c => {
     const full  = 'fomentarinscricoes-' + c.t;
     const short = c.t;
     const k = map[full] ? full : (map[short] ? short : null);
     if (k) map[k].d = c.d;
   });
-
   return Object.values(map).sort((a, b) => (b.wa + b.em) - (a.wa + a.em));
 }
 
-function label(t) {
-  return t.replace('fomentarinscricoes-', '');
-}
+function lbl(t) { return t.replace('fomentarinscricoes-', ''); }
 
 // ─────────────────────────────────────────────────────────────────────────
-// CHART: CRM CONSOLIDADO
+// CHART TEMA
+// ─────────────────────────────────────────────────────────────────────────
+const GC = 'rgba(255,255,255,0.05)';
+const TC = '#6B7280';
+
+function chartH(n) { return Math.max(200, n * 28); }
+
+// ─────────────────────────────────────────────────────────────────────────
+// CRM CONSOLIDADO
 // ─────────────────────────────────────────────────────────────────────────
 function renderCrmChart(terms) {
   if (crmChart) { crmChart.destroy(); crmChart = null; }
-  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-  const tickColor = isDark ? '#9CA3AF' : '#6B7280';
-
-  const labels = terms.map(x => label(x.t));
-  const totals = terms.map(x => x.wa + x.em);
-  const deals  = terms.map(x => x.d);
-  const colors = terms.map(x => x.em > 0 && x.wa === 0 ? '#185FA5' : '#1D9E75');
-
+  const vis = slicePage(terms, 'crm');
+  document.getElementById('wrapCrm').style.height = chartH(vis.length) + 'px';
+  const colors = vis.map(x => x.em > 0 && x.wa === 0 ? '#185FA5' : '#1D9E75');
   crmChart = new Chart(document.getElementById('cvCrm').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: vis.map(x => lbl(x.t)),
+      datasets: [
+        { label:'Inscrições', data:vis.map(x => x.wa+x.em), backgroundColor:colors, borderRadius:3, barThickness:12 },
+        { label:'Negócios',   data:vis.map(x => x.d),       backgroundColor:'#F59E0B', borderRadius:2, barThickness:4 }
+      ]
+    },
+    options: barOpts('crm', vis, terms)
+  });
+  buildPager('pgCrm', 'crm', terms.length);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// WHATSAPP
+// ─────────────────────────────────────────────────────────────────────────
+function renderWaChart(terms) {
+  if (waChart) { waChart.destroy(); waChart = null; }
+  const waTerms = terms.filter(x => x.wa > 0).sort((a, b) => b.wa - a.wa);
+  const vis = slicePage(waTerms, 'wa');
+  document.getElementById('wrapWA').style.height = chartH(vis.length) + 'px';
+  waChart = new Chart(document.getElementById('cvWA').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: vis.map(x => lbl(x.t)),
+      datasets: [
+        { label:'WA',       data:vis.map(x => x.wa), backgroundColor:'#1D9E75', borderRadius:3, barThickness:12 },
+        { label:'Negócios', data:vis.map(x => x.d),  backgroundColor:'#F59E0B', borderRadius:2, barThickness:4 }
+      ]
+    },
+    options: barOpts('wa', vis, waTerms, (x, i) => {
+      const lines = ['WhatsApp: ' + vis[i].wa];
+      if (vis[i].d) lines.push('Negócios: ' + vis[i].d, 'Conv.: ' + (vis[i].d/vis[i].wa*100).toFixed(1) + '%');
+      return lines;
+    })
+  });
+  buildPager('pgWA', 'wa', waTerms.length);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// EMAIL
+// ─────────────────────────────────────────────────────────────────────────
+function renderEmChart(terms) {
+  if (emChart) { emChart.destroy(); emChart = null; }
+  const emTerms = terms.filter(x => x.em > 0).sort((a, b) => b.em - a.em);
+  const vis = slicePage(emTerms, 'em');
+  document.getElementById('wrapEM').style.height = chartH(vis.length) + 'px';
+  emChart = new Chart(document.getElementById('cvEM').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: vis.map(x => lbl(x.t)),
+      datasets: [
+        { label:'Email',    data:vis.map(x => x.em), backgroundColor:'#185FA5', borderRadius:3, barThickness:12 },
+        { label:'Negócios', data:vis.map(x => x.d),  backgroundColor:'#F59E0B', borderRadius:2, barThickness:4 }
+      ]
+    },
+    options: barOpts('em', vis, emTerms, (x, i) => {
+      const lines = ['Email: ' + vis[i].em];
+      if (vis[i].d) lines.push('Negócios: ' + vis[i].d, 'Conv.: ' + (vis[i].d/vis[i].em*100).toFixed(1) + '%');
+      return lines;
+    })
+  });
+  buildPager('pgEM', 'em', emTerms.length);
+}
+
+function barOpts(tab, vis, full, afterBody) {
+  return {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: c => c[0].label,
+          afterBody: afterBody ? c => afterBody(vis[c[0].dataIndex], c[0].dataIndex) : c => {
+            const x = vis[c[0].dataIndex];
+            const lines = [];
+            if (x.wa) lines.push('WhatsApp: ' + x.wa);
+            if (x.em) lines.push('Email: ' + x.em);
+            if (x.d)  lines.push('Negócios: ' + x.d);
+            const tot = x.wa + x.em;
+            if (x.d && tot) lines.push('Conv.: ' + (x.d/tot*100).toFixed(1) + '%');
+            return lines;
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid:{ color:GC }, ticks:{ color:TC, font:{ size:10 } } },
+      y: { ticks:{ color:TC, font:{ size:11 } } }
+    }
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// GRÁFICO POR DIA (colunas empilhadas)
+// ─────────────────────────────────────────────────────────────────────────
+function renderDiaChart(byDay) {
+  if (diaChart) { diaChart.destroy(); diaChart = null; }
+  const sorted = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
+  const labels = sorted.map(([d]) => {
+    const dt = new Date(d + 'T12:00:00');
+    return dt.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
+  });
+  diaChart = new Chart(document.getElementById('cvDia').getContext('2d'), {
     type: 'bar',
     data: {
       labels,
       datasets: [
-        {
-          label: 'Inscrições',
-          data: totals,
-          backgroundColor: colors,
-          borderRadius: 3,
-          barThickness: 12
-        },
-        {
-          label: 'Negócios TBS School',
-          data: deals,
-          backgroundColor: '#F59E0B',
-          borderRadius: 2,
-          barThickness: 4
-        }
+        { label:'WhatsApp', data:sorted.map(([,v]) => v.wa), backgroundColor:'#1D9E75', borderRadius:3 },
+        { label:'Email',    data:sorted.map(([,v]) => v.em), backgroundColor:'#185FA5', borderRadius:3 }
       ]
     },
     options: {
-      indexAxis: 'y',
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            title: c => c[0].label,
-            afterBody: c => {
-              const x = terms[c[0].dataIndex];
-              const lines = [];
-              if (x.wa) lines.push('WhatsApp: ' + x.wa);
-              if (x.em) lines.push('Email: ' + x.em);
-              if (x.d)  lines.push('Negócios fechados: ' + x.d);
-              const tot = x.wa + x.em;
-              if (x.d && tot) lines.push('Conversão: ' + (x.d / tot * 100).toFixed(1) + '%');
-              return lines;
-            }
-          }
-        }
+        legend: { display:true, position:'top', labels:{ color:TC, font:{ size:10 }, boxWidth:10, padding:12 } },
+        tooltip: { callbacks: { afterBody: c => ['Total: ' + (sorted[c[0].dataIndex][1].wa + sorted[c[0].dataIndex][1].em)] } }
       },
       scales: {
-        x: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 } } },
-        y: { ticks: { color: tickColor, font: { size: 11 } } }
+        x: { stacked:true, grid:{ color:GC }, ticks:{ color:TC, font:{ size:10 } } },
+        y: { stacked:true, grid:{ color:GC }, ticks:{ color:TC, font:{ size:10 } } }
       }
     }
   });
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// CHART: WHATSAPP
-// ─────────────────────────────────────────────────────────────────────────
-function renderWaChart(terms) {
-  if (waChart) { waChart.destroy(); waChart = null; }
-  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-  const tickColor = isDark ? '#9CA3AF' : '#6B7280';
-
-  const waTerms = terms.filter(x => x.wa > 0).sort((a, b) => b.wa - a.wa);
-  document.getElementById('wrapWA').style.height = Math.max(300, waTerms.length * 26) + 'px';
-
-  waChart = new Chart(document.getElementById('cvWA').getContext('2d'), {
-    type: 'bar',
-    data: {
-      labels: waTerms.map(x => label(x.t)),
-      datasets: [
-        { label: 'Inscrições WA', data: waTerms.map(x => x.wa), backgroundColor: '#1D9E75', borderRadius: 3, barThickness: 12 },
-        { label: 'Negócios TBS',  data: waTerms.map(x => x.d),  backgroundColor: '#F59E0B', borderRadius: 2, barThickness: 4 }
-      ]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            title: c => c[0].label,
-            afterBody: c => {
-              const x = waTerms[c[0].dataIndex];
-              const lines = ['WhatsApp: ' + x.wa];
-              if (x.d) lines.push('Negócios fechados: ' + x.d);
-              if (x.d && x.wa) lines.push('Conversão: ' + (x.d / x.wa * 100).toFixed(1) + '%');
-              return lines;
-            }
-          }
-        }
-      },
-      scales: {
-        x: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 } } },
-        y: { ticks: { color: tickColor, font: { size: 11 } } }
-      }
-    }
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// CHART: EMAIL
-// ─────────────────────────────────────────────────────────────────────────
-function renderEmChart(terms) {
-  if (emChart) { emChart.destroy(); emChart = null; }
-  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-  const tickColor = isDark ? '#9CA3AF' : '#6B7280';
-
-  const emTerms = terms.filter(x => x.em > 0).sort((a, b) => b.em - a.em);
-  document.getElementById('wrapEM').style.height = Math.max(300, emTerms.length * 26) + 'px';
-
-  emChart = new Chart(document.getElementById('cvEM').getContext('2d'), {
-    type: 'bar',
-    data: {
-      labels: emTerms.map(x => label(x.t)),
-      datasets: [
-        { label: 'Inscrições Email', data: emTerms.map(x => x.em), backgroundColor: '#185FA5', borderRadius: 3, barThickness: 12 },
-        { label: 'Negócios TBS',     data: emTerms.map(x => x.d),  backgroundColor: '#F59E0B', borderRadius: 2, barThickness: 4 }
-      ]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            title: c => c[0].label,
-            afterBody: c => {
-              const x = emTerms[c[0].dataIndex];
-              const lines = ['Email: ' + x.em];
-              if (x.d) lines.push('Negócios fechados: ' + x.d);
-              if (x.d && x.em) lines.push('Conversão: ' + (x.d / x.em * 100).toFixed(1) + '%');
-              return lines;
-            }
-          }
-        }
-      },
-      scales: {
-        x: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 } } },
-        y: { ticks: { color: tickColor, font: { size: 11 } } }
-      }
-    }
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// TABLE: POR DIA
+// TABELA POR DIA
 // ─────────────────────────────────────────────────────────────────────────
 function renderDiaTable(byDay) {
   const DS = ['dom','seg','ter','qua','qui','sex','sáb'];
   const sorted = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
-  const maxTot = Math.max(...sorted.map(([, v]) => v.wa + v.em), 1);
-  let acum = 0;
+  const maxTot = Math.max(...sorted.map(([,v]) => v.wa+v.em), 1);
+  const vis = slicePage(sorted, 'dia');
+
+  let acum = sorted.slice(0, (PAGE.dia-1)*pageSize).reduce((s,[,v]) => s+v.wa+v.em, 0);
 
   let h = `<thead><tr>
-    <th>Dia</th>
-    <th></th>
-    <th class="r">WhatsApp</th>
-    <th class="r">Email</th>
-    <th class="r">Total</th>
-    <th class="r">Acumulado</th>
-    <th style="width:30%">Volume</th>
+    <th>Dia</th><th></th>
+    <th class="r">WhatsApp</th><th class="r">Email</th>
+    <th class="r">Total</th><th class="r">Acumulado</th>
+    <th style="width:28%">Volume</th>
   </tr></thead><tbody>`;
 
-  sorted.forEach(([date, v]) => {
+  vis.forEach(([date, v]) => {
     const tot = v.wa + v.em;
     acum += tot;
-    const dt = new Date(date + 'T12:00:00');
-    const ds = DS[dt.getDay()];
-    const fmt = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const dt  = new Date(date + 'T12:00:00');
+    const ds  = DS[dt.getDay()];
+    const fmt = dt.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
     const peak = tot === maxTot;
     const wknd = ds === 'sáb' || ds === 'dom';
     const wPct = Math.round(v.wa / maxTot * 100);
     const ePct = Math.round(v.em / maxTot * 100);
-
     h += `<tr style="${peak ? 'background:var(--bg2)' : ''}">
-      <td style="font-weight:${peak ? 600 : 400};padding-left:0;">${fmt}</td>
+      <td style="font-weight:${peak?600:400};padding-left:0">${fmt}</td>
       <td style="font-size:11px;color:${wknd ? '#7F77DD' : 'var(--text3)'};">${ds}</td>
-      <td class="r" style="color:${v.wa ? '#1D9E75' : 'var(--text3)'};">${v.wa || '—'}</td>
-      <td class="r" style="color:${v.em ? '#185FA5' : 'var(--text3)'};">${v.em || '—'}</td>
-      <td class="r" style="font-weight:${peak ? 600 : 500};">${tot}</td>
+      <td class="r" style="color:${v.wa?'#1D9E75':'var(--text3)'};">${v.wa||'—'}</td>
+      <td class="r" style="color:${v.em?'#185FA5':'var(--text3)'};">${v.em||'—'}</td>
+      <td class="r" style="font-weight:${peak?600:500};">${tot}</td>
       <td class="r" style="color:var(--text2);">${acum.toLocaleString('pt-BR')}</td>
-      <td style="padding-right:0;">
-        <div style="display:flex;height:8px;border-radius:3px;overflow:hidden;gap:1px;">
-          ${v.wa ? `<div style="width:${wPct}%;background:#1D9E75;min-width:2px;"></div>` : ''}
-          ${v.em ? `<div style="width:${ePct}%;background:#185FA5;min-width:2px;"></div>` : ''}
+      <td style="padding-right:0">
+        <div style="display:flex;height:8px;border-radius:3px;overflow:hidden;gap:1px">
+          ${v.wa ? `<div style="width:${wPct}%;background:#1D9E75;min-width:2px"></div>` : ''}
+          ${v.em ? `<div style="width:${ePct}%;background:#185FA5;min-width:2px"></div>` : ''}
         </div>
       </td>
     </tr>`;
   });
 
-  const tWA = sorted.reduce((s, [, v]) => s + v.wa, 0);
-  const tEM = sorted.reduce((s, [, v]) => s + v.em, 0);
+  const tWA = sorted.reduce((s,[,v]) => s+v.wa, 0);
+  const tEM = sorted.reduce((s,[,v]) => s+v.em, 0);
   h += `<tr>
-    <td colspan="2" style="font-weight:500;color:var(--text2);padding-left:0;border-top:1px solid var(--border);">Total</td>
-    <td class="r" style="font-weight:500;color:#1D9E75;border-top:1px solid var(--border);">${tWA.toLocaleString('pt-BR')}</td>
-    <td class="r" style="font-weight:500;color:#185FA5;border-top:1px solid var(--border);">${tEM.toLocaleString('pt-BR')}</td>
-    <td class="r" style="font-weight:600;border-top:1px solid var(--border);">${(tWA + tEM).toLocaleString('pt-BR')}</td>
-    <td colspan="2" style="border-top:1px solid var(--border);"></td>
+    <td colspan="2" style="font-weight:500;color:var(--text2);padding-left:0;border-top:1px solid var(--border)">Total</td>
+    <td class="r" style="font-weight:500;color:#1D9E75;border-top:1px solid var(--border)">${tWA.toLocaleString('pt-BR')}</td>
+    <td class="r" style="font-weight:500;color:#185FA5;border-top:1px solid var(--border)">${tEM.toLocaleString('pt-BR')}</td>
+    <td class="r" style="font-weight:600;border-top:1px solid var(--border)">${(tWA+tEM).toLocaleString('pt-BR')}</td>
+    <td colspan="2" style="border-top:1px solid var(--border)"></td>
   </tr>`;
 
   document.getElementById('divDia').innerHTML = '<table>' + h + '</tbody></table>';
+  buildPager('pgDia', 'dia', sorted.length);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// TABLE: COMPRAS
+// TABELA COMPRAS
 // ─────────────────────────────────────────────────────────────────────────
 function renderCompTable() {
-  const rows = [...CONV].sort((a, b) => {
-    const ra = a.insc ? a.d / a.insc : 0;
-    const rb = b.insc ? b.d / b.insc : 0;
+  const rows = filteredConv().sort((a, b) => {
+    const ra = a.insc ? a.d/a.insc : 0;
+    const rb = b.insc ? b.d/b.insc : 0;
     return rb - ra;
   });
-  const maxPct = Math.max(...rows.map(r => r.insc ? r.d / r.insc : 0));
+  const maxRate = Math.max(...rows.map(r => r.insc ? r.d/r.insc : 0));
+  const vis = slicePage(rows, 'comp');
 
   let h = `<thead><tr>
-    <th>utm_term_tbs</th>
-    <th>Canal</th>
-    <th class="r">Inscrições</th>
-    <th class="r">Negócios</th>
-    <th style="width:35%">Conversão</th>
+    <th>utm_term_tbs</th><th>Canal</th>
+    <th class="r">Inscrições</th><th class="r">Negócios</th>
+    <th style="width:32%">Conversão</th>
   </tr></thead><tbody>`;
 
-  rows.forEach(r => {
-    const pct = r.insc ? r.d / r.insc * 100 : 0;
-    const barColor = pct >= 40 ? '#0F6E56' : pct >= 20 ? '#1D9E75' : pct >= 10 ? '#5DCAA5' : '#9FE1CB';
-    const chC = r.ch === 'WA' ? '#1D9E75' : '#185FA5';
-    const barW = maxPct > 0 ? Math.round(pct / maxPct * 100) : 0;
-
+  vis.forEach(r => {
+    const rate = r.insc ? r.d/r.insc : 0;
+    const pct  = rate * 100;
+    const barW = maxRate > 0 ? Math.round(rate/maxRate*100) : 0;
+    const barC = pct >= 40 ? '#0F6E56' : pct >= 20 ? '#1D9E75' : pct >= 10 ? '#5DCAA5' : '#9FE1CB';
+    const chC  = r.ch === 'WA' ? '#1D9E75' : '#185FA5';
     h += `<tr>
-      <td style="padding-left:0;">${r.t}</td>
-      <td><span class="badge" style="background:${chC}22;color:${chC};">${r.ch}</span></td>
-      <td class="r" style="color:var(--text2);">${r.insc}</td>
-      <td class="r" style="font-weight:${r.d > 0 ? 500 : 400};color:${r.d > 0 ? 'var(--text)' : 'var(--text3)'};">${r.d}</td>
+      <td style="padding-left:0">${r.t}</td>
+      <td><span class="badge" style="background:${chC}22;color:${chC}">${r.ch}</span></td>
+      <td class="r" style="color:var(--text2)">${r.insc}</td>
+      <td class="r" style="font-weight:${r.d>0?500:400};color:${r.d>0?'var(--text)':'var(--text3)'}">${r.d}</td>
       <td>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div style="flex:1;background:var(--bg2);border-radius:3px;height:6px;overflow:hidden;">
-            <div style="width:${barW}%;height:100%;background:${barColor};border-radius:3px;"></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;background:var(--bg2);border-radius:3px;height:6px;overflow:hidden">
+            <div style="width:${barW}%;height:100%;background:${barC};border-radius:3px"></div>
           </div>
-          <span style="font-size:12px;font-weight:500;min-width:38px;text-align:right;">${pct.toFixed(1)}%</span>
+          <span style="font-size:12px;font-weight:500;min-width:38px;text-align:right">${pct.toFixed(1)}%</span>
         </div>
       </td>
     </tr>`;
   });
 
   document.getElementById('tblComp').innerHTML = h + '</tbody>';
+  buildPager('pgComp', 'comp', rows.length);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// TABLE: HEATMAP
+// HEATMAP
 // ─────────────────────────────────────────────────────────────────────────
 function renderHeatmap() {
   function bg(v) {
@@ -666,36 +834,34 @@ function renderHeatmap() {
   function fg(v) { return v >= 26 ? '#fff' : '#085041'; }
 
   const rT = HBASES.map((_, bi) => H.reduce((s, r) => s + r[bi], 0));
-  const cT = Array.from({ length: 24 }, (_, h) => H[h].reduce((s, v) => s + v, 0));
-  const si  = [...HBASES.keys()].sort((a, b) => rT[b] - rT[a]);
+  const cT = Array.from({ length:24 }, (_, h) => H[h].reduce((s, v) => s + v, 0));
+  const si = [...HBASES.keys()].sort((a, b) => rT[b] - rT[a]);
 
-  let html = `<thead><tr>
-    <th style="min-width:120px;font-size:10px;padding-left:0;">Base</th>`;
+  let html = `<thead><tr><th style="min-width:120px;font-size:10px;padding-left:0">Base</th>`;
   for (let h = 0; h < 24; h++) {
     const hot = [9,11,13,17].includes(h);
-    html += `<th style="text-align:center;font-size:9px;min-width:18px;font-weight:${hot?500:400};color:${hot?'var(--text)':'var(--text3)'};">${h}h</th>`;
+    html += `<th style="text-align:center;font-size:9px;min-width:18px;font-weight:${hot?500:400};color:${hot?'var(--text)':'var(--text3)'}">${h}h</th>`;
   }
-  html += '<th style="text-align:right;font-size:10px;min-width:36px;">Total</th></tr></thead><tbody>';
+  html += '<th style="text-align:right;font-size:10px;min-width:36px">Total</th></tr></thead><tbody>';
 
   si.forEach(bi => {
-    html += `<tr>
-      <td style="padding-left:0;white-space:nowrap;">
-        <span style="font-size:10.5px;">${HBASES[bi]}</span>
-        <span class="badge" style="background:${HCOL[bi]}22;color:${HCOL[bi]};margin-left:4px;font-size:8.5px;">${HCHAN[bi]}</span>
-      </td>`;
+    html += `<tr><td style="padding-left:0;white-space:nowrap">
+      <span style="font-size:10.5px">${HBASES[bi]}</span>
+      <span class="badge" style="background:${HCOL[bi]}22;color:${HCOL[bi]};margin-left:4px;font-size:8.5px">${HCHAN[bi]}</span>
+    </td>`;
     for (let h = 0; h < 24; h++) {
       const v = H[h][bi];
-      html += `<td style="background:${bg(v)};text-align:center;border-radius:2px;font-size:8px;color:${fg(v)};font-weight:500;padding:3px 0;">${v || ''}</td>`;
+      html += `<td style="background:${bg(v)};text-align:center;border-radius:2px;font-size:8px;color:${fg(v)};font-weight:500;padding:3px 0">${v||''}</td>`;
     }
-    html += `<td style="text-align:right;font-size:10px;font-weight:500;">${rT[bi]}</td></tr>`;
+    html += `<td style="text-align:right;font-size:10px;font-weight:500">${rT[bi]}</td></tr>`;
   });
 
   html += `</tbody><tfoot><tr>
-    <td style="font-size:10px;font-weight:500;color:var(--text2);padding-left:0;border-top:1px solid var(--border);">Total/hora</td>`;
+    <td style="font-size:10px;font-weight:500;color:var(--text2);padding-left:0;border-top:1px solid var(--border)">Total/hora</td>`;
   cT.forEach(ct => {
-    html += `<td style="text-align:center;font-size:9px;font-weight:${ct >= 80 ? 500 : 400};color:${ct >= 80 ? 'var(--text)' : 'var(--text2)'};border-top:1px solid var(--border);">${ct || ''}</td>`;
+    html += `<td style="text-align:center;font-size:9px;font-weight:${ct>=80?500:400};color:${ct>=80?'var(--text)':'var(--text2)'};border-top:1px solid var(--border)">${ct||''}</td>`;
   });
-  html += `<td style="text-align:right;font-size:10px;font-weight:500;border-top:1px solid var(--border);">${cT.reduce((a,b)=>a+b,0)}</td></tr></tfoot>`;
+  html += `<td style="text-align:right;font-size:10px;font-weight:500;border-top:1px solid var(--border)">${cT.reduce((a,b)=>a+b,0)}</td></tr></tfoot>`;
 
   document.getElementById('tblHeat').innerHTML = html;
 }
@@ -709,12 +875,14 @@ function setTab(t) {
     document.getElementById('btn-' + id).className     = id === t ? 'tab-btn active' : 'tab-btn';
   });
   activeTab = t;
-
   if (liveData) {
-    const terms = buildTerms(liveData);
-    if (t === 'crm') renderCrmChart(terms);
-    if (t === 'wa')  renderWaChart(terms);
-    if (t === 'em')  renderEmChart(terms);
+    const terms = filteredTerms(liveData);
+    const byday = filteredByDay(liveData);
+    if (t === 'crm')  renderCrmChart(terms);
+    if (t === 'wa')   renderWaChart(terms);
+    if (t === 'em')   renderEmChart(terms);
+    if (t === 'dia')  { renderDiaChart(byday); renderDiaTable(byday); }
+    if (t === 'comp') renderCompTable();
   }
 }
 

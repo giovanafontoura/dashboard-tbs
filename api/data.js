@@ -16,6 +16,7 @@ export default async function handler(req, res) {
     const waByTerm = {};
     const emByTerm = {};
     const byDay = {};
+    const byDayByTerm = {};
 
     for (const { properties: p } of contacts) {
       const isWA = p.fonte__tbs_ === 'organic social' &&
@@ -34,6 +35,8 @@ export default async function handler(req, res) {
         if (day) {
           byDay[day] = byDay[day] || { wa: 0, em: 0 };
           byDay[day].wa++;
+          byDayByTerm[day] = byDayByTerm[day] || { wa: {}, em: {} };
+          byDayByTerm[day].wa[term] = (byDayByTerm[day].wa[term] || 0) + 1;
         }
       }
       if (isEM) {
@@ -41,6 +44,8 @@ export default async function handler(req, res) {
         if (day) {
           byDay[day] = byDay[day] || { wa: 0, em: 0 };
           byDay[day].em++;
+          byDayByTerm[day] = byDayByTerm[day] || { wa: {}, em: {} };
+          byDayByTerm[day].em[term] = (byDayByTerm[day].em[term] || 0) + 1;
         }
       }
     }
@@ -52,6 +57,7 @@ export default async function handler(req, res) {
       waByTerm,
       emByTerm,
       byDay,
+      byDayByTerm,
       totals: {
         wa:    totWA,
         em:    totEM,
