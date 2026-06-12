@@ -119,6 +119,33 @@
     td:first-child, th:first-child { padding-left: 0; }
     .badge { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
     .nota { font-size: 11px; color: var(--text3); margin-bottom: 12px; }
+
+    /* ── EDIÇÃO INLINE ── */
+    .stats-header { display:flex; align-items:center; justify-content:space-between; margin:24px 0 12px; }
+    .stats-title { font-size:12px; font-weight:500; color:var(--text2); }
+    .edit-btns { display:flex; gap:6px; }
+    .btn-edit {
+      padding:4px 11px; font-size:11.5px; cursor:pointer; border-radius:5px;
+      border:0.5px solid var(--border); background:transparent; color:var(--text2); transition:background .12s;
+    }
+    .btn-edit:hover { background:var(--bg2); }
+    .btn-save {
+      padding:4px 11px; font-size:11.5px; cursor:pointer; border-radius:5px;
+      border:none; background:var(--accent); color:var(--bg); font-weight:500; transition:opacity .12s;
+    }
+    .btn-save:hover { opacity:.85; }
+    .btn-cancel {
+      padding:4px 11px; font-size:11.5px; cursor:pointer; border-radius:5px;
+      border:0.5px solid var(--border); background:transparent; color:var(--text2); transition:background .12s;
+    }
+    .btn-cancel:hover { background:var(--bg2); }
+    .inp-metric {
+      width:72px; background:var(--bg); border:0.5px solid var(--accent); border-radius:4px;
+      color:var(--text); padding:3px 6px; font-size:12px; text-align:right; outline:none;
+    }
+    .inp-metric:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(240,130,32,.18); }
+    .saved-tag { font-size:10.5px; color:#1D9E75; margin-left:6px; opacity:0; transition:opacity .3s; }
+    .saved-tag.show { opacity:1; }
   </style>
 </head>
 <body>
@@ -167,12 +194,13 @@
   </div>
 
   <div class="nav">
-    <button class="tab-btn active" id="btn-crm"  onclick="setTab('crm')">CRM Consolidado</button>
-    <button class="tab-btn"        id="btn-wa"   onclick="setTab('wa')">WhatsApp</button>
-    <button class="tab-btn"        id="btn-em"   onclick="setTab('em')">Email</button>
-    <button class="tab-btn"        id="btn-dia"  onclick="setTab('dia')">Por dia</button>
-    <button class="tab-btn"        id="btn-comp" onclick="setTab('comp')">Compras</button>
-    <button class="tab-btn"        id="btn-heat" onclick="setTab('heat')">Heatmap</button>
+    <button class="tab-btn active" id="btn-crm"    onclick="setTab('crm')">CRM Consolidado</button>
+    <button class="tab-btn"        id="btn-wa"     onclick="setTab('wa')">WhatsApp</button>
+    <button class="tab-btn"        id="btn-em"     onclick="setTab('em')">Email</button>
+    <button class="tab-btn"        id="btn-estats" onclick="setTab('estats')">Stats Email</button>
+    <button class="tab-btn"        id="btn-dia"    onclick="setTab('dia')">Por dia</button>
+    <button class="tab-btn"        id="btn-comp"   onclick="setTab('comp')">Compras</button>
+    <button class="tab-btn"        id="btn-heat"   onclick="setTab('heat')">Heatmap</button>
   </div>
 
   <!-- CRM Consolidado -->
@@ -187,6 +215,15 @@
     <p class="nota">Inscrições via WhatsApp por disparo · amarelo = negócios The Best School</p>
     <div id="wrapWA" class="chart-wrap"><canvas id="cvWA"></canvas></div>
     <div id="pgWA"></div>
+    <!-- Disparos enviados (editável) -->
+    <div class="stats-header">
+      <span class="stats-title">Disparos enviados por base</span>
+      <div class="edit-btns" id="waEditBtns">
+        <span class="saved-tag" id="waSavedTag">✔ Salvo</span>
+        <button class="btn-edit" onclick="startEdit('wa')">✏ Editar</button>
+      </div>
+    </div>
+    <table id="tblWaSend"></table>
   </div>
 
   <!-- Email -->
@@ -194,6 +231,19 @@
     <p class="nota">Inscrições via Email por disparo · amarelo = negócios The Best School</p>
     <div id="wrapEM" class="chart-wrap"><canvas id="cvEM"></canvas></div>
     <div id="pgEM"></div>
+  </div>
+
+  <!-- Stats Email -->
+  <div id="tab-estats" style="display:none">
+    <div class="stats-header" style="margin-top:0">
+      <span class="stats-title">Performance por disparo de email</span>
+      <div class="edit-btns" id="emEditBtns">
+        <span class="saved-tag" id="emSavedTag">✔ Salvo</span>
+        <button class="btn-edit" onclick="startEdit('em')">✏ Editar</button>
+      </div>
+    </div>
+    <p class="nota">Preencha entregues, aberturas e cliques de cada disparo · dados salvos no navegador</p>
+    <table id="tblEmStats"></table>
   </div>
 
   <!-- Por dia -->
@@ -290,6 +340,23 @@ const PAGE = { crm:1, wa:1, em:1, dia:1, comp:1 };
 let pageSize = 10;
 let filterStart = null;
 let filterEnd   = null;
+
+// Métricas manuais (salvas em localStorage)
+let emailMetrics = {}; // { term: { entregues, aberturas, cliques } }
+let waMetrics    = {}; // { term: { disparos } }
+let waEditing    = false;
+let emEditing    = false;
+const LS_EM = 'tbs_em_metrics_2026';
+const LS_WA = 'tbs_wa_metrics_2026';
+
+function loadSavedMetrics() {
+  try {
+    const em = localStorage.getItem(LS_EM);
+    const wa = localStorage.getItem(LS_WA);
+    if (em) emailMetrics = JSON.parse(em);
+    if (wa) waMetrics    = JSON.parse(wa);
+  } catch(e) {}
+}
 
 // ─────────────────────────────────────────────────────────────────────────
 // DEMO DATA
@@ -498,6 +565,7 @@ async function loadData() {
   btn.textContent = '↻ Atualizando…';
   document.getElementById('status').textContent = 'Buscando dados no HubSpot…';
 
+  loadSavedMetrics();
   try {
     const res = await fetch('/api/data');
     if (!res.ok) throw new Error(`Erro ${res.status}`);
@@ -543,7 +611,9 @@ function renderAll(data) {
 
   renderCrmChart(terms);
   renderWaChart(terms);
+  renderWaSends(terms);
   renderEmChart(terms);
+  renderEmStats(terms);
   renderDiaChart(byday);
   renderDiaTable(byday);
   renderCompTable();
@@ -867,10 +937,158 @@ function renderHeatmap() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// WA SENDS (tabela editável)
+// ─────────────────────────────────────────────────────────────────────────
+function renderWaSends(terms) {
+  const waTerms = terms.filter(x => x.wa > 0).sort((a, b) => b.wa - a.wa);
+  const el = document.getElementById('tblWaSend');
+  if (!el) return;
+
+  let h = `<thead><tr>
+    <th>Disparo</th>
+    <th class="r">Disparados</th>
+    <th class="r">Inscrições</th>
+    <th class="r">% Conv.</th>
+  </tr></thead><tbody>`;
+
+  waTerms.forEach((x, i) => {
+    const key  = x.t;
+    const disp = (waMetrics[key] && waMetrics[key].disparos) || 0;
+    const conv = disp ? (x.wa / disp * 100).toFixed(1) + '%' : '—';
+    const dispCell = waEditing
+      ? `<input class="inp-metric" type="number" min="0" data-term="${key}" data-field="disparos" value="${disp || ''}" placeholder="0">`
+      : (disp ? disp.toLocaleString('pt-BR') : `<span style="color:var(--text3)">—</span>`);
+    h += `<tr>
+      <td style="padding-left:0">${lbl(key)}</td>
+      <td class="r">${dispCell}</td>
+      <td class="r" style="color:#1D9E75">${x.wa.toLocaleString('pt-BR')}</td>
+      <td class="r" style="color:${disp ? 'var(--accent)' : 'var(--text3)'};font-weight:${disp ? 500 : 400}">${conv}</td>
+    </tr>`;
+  });
+
+  el.innerHTML = h + '</tbody>';
+  updateEditBtns('wa');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// EMAIL STATS (tabela editável)
+// ─────────────────────────────────────────────────────────────────────────
+function renderEmStats(terms) {
+  const emTerms = terms.filter(x => x.em > 0).sort((a, b) => b.em - a.em);
+  const el = document.getElementById('tblEmStats');
+  if (!el) return;
+
+  let h = `<thead><tr>
+    <th>Disparo</th>
+    <th class="r">Entregues</th>
+    <th class="r">Aberturas</th>
+    <th class="r">% Abert.</th>
+    <th class="r">Cliques</th>
+    <th class="r">% Clique</th>
+    <th class="r">Inscrições</th>
+    <th class="r">% Conv.</th>
+  </tr></thead><tbody>`;
+
+  emTerms.forEach((x, i) => {
+    const key = x.t;
+    const m   = emailMetrics[key] || {};
+    const ent = m.entregues || 0;
+    const abr = m.aberturas || 0;
+    const clk = m.cliques   || 0;
+    const pAbr = ent ? (abr / ent * 100).toFixed(1) + '%' : '—';
+    const pClk = ent ? (clk / ent * 100).toFixed(1) + '%' : '—';
+    const pInsc = ent ? (x.em / ent * 100).toFixed(1) + '%' : '—';
+
+    function cell(field, val) {
+      if (!emEditing) return val ? val.toLocaleString('pt-BR') : `<span style="color:var(--text3)">—</span>`;
+      return `<input class="inp-metric" type="number" min="0" data-term="${key}" data-field="${field}" value="${val || ''}" placeholder="0">`;
+    }
+
+    h += `<tr>
+      <td style="padding-left:0;white-space:nowrap">${lbl(key)}</td>
+      <td class="r">${cell('entregues', ent)}</td>
+      <td class="r">${cell('aberturas', abr)}</td>
+      <td class="r" style="color:${ent?'var(--text2)':'var(--text3)'}">${pAbr}</td>
+      <td class="r">${cell('cliques', clk)}</td>
+      <td class="r" style="color:${ent?'var(--text2)':'var(--text3)'}">${pClk}</td>
+      <td class="r" style="color:#185FA5;font-weight:500">${x.em.toLocaleString('pt-BR')}</td>
+      <td class="r" style="color:${ent?'var(--accent)':'var(--text3)'};font-weight:${ent?500:400}">${pInsc}</td>
+    </tr>`;
+  });
+
+  el.innerHTML = h + '</tbody>';
+  updateEditBtns('em');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// EDIÇÃO / SAVE / CANCEL
+// ─────────────────────────────────────────────────────────────────────────
+function updateEditBtns(type) {
+  const id   = type === 'wa' ? 'waEditBtns' : 'emEditBtns';
+  const edit = type === 'wa' ? waEditing : emEditing;
+  const el   = document.getElementById(id);
+  if (!el) return;
+  if (edit) {
+    el.innerHTML = `
+      <button class="btn-save"   onclick="saveEdit('${type}')">✔ Salvar</button>
+      <button class="btn-cancel" onclick="cancelEdit('${type}')">✕</button>`;
+  } else {
+    const tag = type === 'wa' ? 'waSavedTag' : 'emSavedTag';
+    el.innerHTML = `
+      <span class="saved-tag" id="${tag}">✔ Salvo</span>
+      <button class="btn-edit" onclick="startEdit('${type}')">✏ Editar</button>`;
+  }
+}
+
+function startEdit(type) {
+  if (type === 'wa') waEditing = true; else emEditing = true;
+  if (liveData) {
+    const terms = filteredTerms(liveData);
+    if (type === 'wa') renderWaSends(terms); else renderEmStats(terms);
+  }
+}
+
+function cancelEdit(type) {
+  if (type === 'wa') waEditing = false; else emEditing = false;
+  if (liveData) {
+    const terms = filteredTerms(liveData);
+    if (type === 'wa') renderWaSends(terms); else renderEmStats(terms);
+  }
+}
+
+function saveEdit(type) {
+  const selector = type === 'wa' ? '#tblWaSend input[data-term]' : '#tblEmStats input[data-term]';
+  document.querySelectorAll(selector).forEach(inp => {
+    const term  = inp.dataset.term;
+    const field = inp.dataset.field;
+    const val   = parseInt(inp.value) || 0;
+    if (type === 'wa') {
+      waMetrics[term] = waMetrics[term] || {};
+      waMetrics[term][field] = val;
+    } else {
+      emailMetrics[term] = emailMetrics[term] || {};
+      emailMetrics[term][field] = val;
+    }
+  });
+  localStorage.setItem(type === 'wa' ? LS_WA : LS_EM, JSON.stringify(type === 'wa' ? waMetrics : emailMetrics));
+  if (type === 'wa') waEditing = false; else emEditing = false;
+  if (liveData) {
+    const terms = filteredTerms(liveData);
+    if (type === 'wa') renderWaSends(terms); else renderEmStats(terms);
+  }
+  // flash "Salvo"
+  const tagId = type === 'wa' ? 'waSavedTag' : 'emSavedTag';
+  setTimeout(() => {
+    const tag = document.getElementById(tagId);
+    if (tag) { tag.classList.add('show'); setTimeout(() => tag.classList.remove('show'), 2000); }
+  }, 50);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // TROCAR ABA
 // ─────────────────────────────────────────────────────────────────────────
 function setTab(t) {
-  ['crm','wa','em','dia','comp','heat'].forEach(id => {
+  ['crm','wa','em','estats','dia','comp','heat'].forEach(id => {
     document.getElementById('tab-' + id).style.display = id === t ? 'block' : 'none';
     document.getElementById('btn-' + id).className     = id === t ? 'tab-btn active' : 'tab-btn';
   });
@@ -878,11 +1096,12 @@ function setTab(t) {
   if (liveData) {
     const terms = filteredTerms(liveData);
     const byday = filteredByDay(liveData);
-    if (t === 'crm')  renderCrmChart(terms);
-    if (t === 'wa')   renderWaChart(terms);
-    if (t === 'em')   renderEmChart(terms);
-    if (t === 'dia')  { renderDiaChart(byday); renderDiaTable(byday); }
-    if (t === 'comp') renderCompTable();
+    if (t === 'crm')    renderCrmChart(terms);
+    if (t === 'wa')     { renderWaChart(terms); renderWaSends(terms); }
+    if (t === 'em')     renderEmChart(terms);
+    if (t === 'estats') renderEmStats(terms);
+    if (t === 'dia')    { renderDiaChart(byday); renderDiaTable(byday); }
+    if (t === 'comp')   renderCompTable();
   }
 }
 
