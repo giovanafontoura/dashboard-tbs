@@ -197,7 +197,6 @@
     <button class="tab-btn active" id="btn-crm"    onclick="setTab('crm')">CRM Consolidado</button>
     <button class="tab-btn"        id="btn-wa"     onclick="setTab('wa')">WhatsApp</button>
     <button class="tab-btn"        id="btn-em"     onclick="setTab('em')">Email</button>
-    <button class="tab-btn"        id="btn-estats" onclick="setTab('estats')">Stats Email</button>
     <button class="tab-btn"        id="btn-dia"    onclick="setTab('dia')">Por dia</button>
     <button class="tab-btn"        id="btn-comp"   onclick="setTab('comp')">Compras</button>
     <button class="tab-btn"        id="btn-heat"   onclick="setTab('heat')">Heatmap</button>
@@ -231,19 +230,17 @@
     <p class="nota">Inscrições via Email por disparo · amarelo = negócios The Best School</p>
     <div id="wrapEM" class="chart-wrap"><canvas id="cvEM"></canvas></div>
     <div id="pgEM"></div>
-  </div>
-
-  <!-- Stats Email -->
-  <div id="tab-estats" style="display:none">
-    <div class="stats-header" style="margin-top:0">
+    <!-- Performance de email (editável) -->
+    <div class="stats-header">
       <span class="stats-title">Performance por disparo de email</span>
       <div class="edit-btns" id="emEditBtns">
         <span class="saved-tag" id="emSavedTag">✔ Salvo</span>
         <button class="btn-edit" onclick="startEdit('em')">✏ Editar</button>
       </div>
     </div>
-    <p class="nota">Preencha entregues, aberturas e cliques de cada disparo · dados salvos no navegador</p>
+    <p class="nota">Preencha entregues, aberturas e cliques · dados salvos no navegador</p>
     <table id="tblEmStats"></table>
+    <div id="pgEmStats"></div>
   </div>
 
   <!-- Por dia -->
@@ -336,7 +333,7 @@ const H = [
 let crmChart = null, waChart = null, emChart = null, diaChart = null;
 let liveData = null;
 let activeTab = 'crm';
-const PAGE = { crm:1, wa:1, em:1, dia:1, comp:1 };
+const PAGE = { crm:1, wa:1, em:1, estats:1, dia:1, comp:1 };
 let pageSize = 10;
 let filterStart = null;
 let filterEnd   = null;
@@ -511,8 +508,8 @@ function reRenderTab() {
   const terms = filteredTerms(liveData);
   const byday = filteredByDay(liveData);
   if (activeTab === 'crm')  renderCrmChart(terms);
-  if (activeTab === 'wa')   renderWaChart(terms);
-  if (activeTab === 'em')   renderEmChart(terms);
+  if (activeTab === 'wa')   { renderWaChart(terms); renderWaSends(terms); }
+  if (activeTab === 'em')   { renderEmChart(terms); renderEmStats(terms); }
   if (activeTab === 'dia')  { renderDiaChart(byday); renderDiaTable(byday); }
   if (activeTab === 'comp') renderCompTable();
 }
@@ -978,6 +975,9 @@ function renderEmStats(terms) {
   const el = document.getElementById('tblEmStats');
   if (!el) return;
 
+  // in edit mode show all rows; otherwise paginate
+  const vis = emEditing ? emTerms : slicePage(emTerms, 'estats');
+
   let h = `<thead><tr>
     <th>Disparo</th>
     <th class="r">Entregues</th>
@@ -989,14 +989,14 @@ function renderEmStats(terms) {
     <th class="r">% Conv.</th>
   </tr></thead><tbody>`;
 
-  emTerms.forEach((x, i) => {
+  vis.forEach(x => {
     const key = x.t;
     const m   = emailMetrics[key] || {};
     const ent = m.entregues || 0;
     const abr = m.aberturas || 0;
     const clk = m.cliques   || 0;
-    const pAbr = ent ? (abr / ent * 100).toFixed(1) + '%' : '—';
-    const pClk = ent ? (clk / ent * 100).toFixed(1) + '%' : '—';
+    const pAbr  = ent ? (abr / ent * 100).toFixed(1) + '%' : '—';
+    const pClk  = ent ? (clk / ent * 100).toFixed(1) + '%' : '—';
     const pInsc = ent ? (x.em / ent * 100).toFixed(1) + '%' : '—';
 
     function cell(field, val) {
@@ -1017,6 +1017,8 @@ function renderEmStats(terms) {
   });
 
   el.innerHTML = h + '</tbody>';
+  if (!emEditing) buildPager('pgEmStats', 'estats', emTerms.length);
+  else { const pg = document.getElementById('pgEmStats'); if (pg) pg.innerHTML = ''; }
   updateEditBtns('em');
 }
 
@@ -1088,7 +1090,7 @@ function saveEdit(type) {
 // TROCAR ABA
 // ─────────────────────────────────────────────────────────────────────────
 function setTab(t) {
-  ['crm','wa','em','estats','dia','comp','heat'].forEach(id => {
+  ['crm','wa','em','dia','comp','heat'].forEach(id => {
     document.getElementById('tab-' + id).style.display = id === t ? 'block' : 'none';
     document.getElementById('btn-' + id).className     = id === t ? 'tab-btn active' : 'tab-btn';
   });
@@ -1096,12 +1098,11 @@ function setTab(t) {
   if (liveData) {
     const terms = filteredTerms(liveData);
     const byday = filteredByDay(liveData);
-    if (t === 'crm')    renderCrmChart(terms);
-    if (t === 'wa')     { renderWaChart(terms); renderWaSends(terms); }
-    if (t === 'em')     renderEmChart(terms);
-    if (t === 'estats') renderEmStats(terms);
-    if (t === 'dia')    { renderDiaChart(byday); renderDiaTable(byday); }
-    if (t === 'comp')   renderCompTable();
+    if (t === 'crm')  renderCrmChart(terms);
+    if (t === 'wa')   { renderWaChart(terms); renderWaSends(terms); }
+    if (t === 'em')   { renderEmChart(terms); renderEmStats(terms); }
+    if (t === 'dia')  { renderDiaChart(byday); renderDiaTable(byday); }
+    if (t === 'comp') renderCompTable();
   }
 }
 
