@@ -223,6 +223,7 @@
       </div>
     </div>
     <table id="tblWaSend"></table>
+    <div id="pgWaSend"></div>
   </div>
 
   <!-- Email -->
@@ -333,14 +334,14 @@ const H = [
 let crmChart = null, waChart = null, emChart = null, diaChart = null;
 let liveData = null;
 let activeTab = 'crm';
-const PAGE = { crm:1, wa:1, em:1, estats:1, dia:1, comp:1 };
+const PAGE = { crm:1, wa:1, 'wa-send':1, em:1, estats:1, dia:1, comp:1 };
 let pageSize = 10;
 let filterStart = null;
 let filterEnd   = null;
 
 // Métricas manuais (salvas em localStorage)
 let emailMetrics = {}; // { term: { entregues, aberturas, cliques } }
-let waMetrics    = {}; // { term: { disparos } }
+let waMetrics    = {}; // { term: { disparos, aberturas, cliques } }
 let waEditing    = false;
 let emEditing    = false;
 const LS_EM = 'tbs_em_metrics_2026';
@@ -941,29 +942,49 @@ function renderWaSends(terms) {
   const el = document.getElementById('tblWaSend');
   if (!el) return;
 
+  const vis = waEditing ? waTerms : slicePage(waTerms, 'wa-send');
+
   let h = `<thead><tr>
     <th>Disparo</th>
     <th class="r">Disparados</th>
+    <th class="r">Aberturas</th>
+    <th class="r">% Abert.</th>
+    <th class="r">Cliques</th>
+    <th class="r">% Clique</th>
     <th class="r">Inscrições</th>
     <th class="r">% Conv.</th>
   </tr></thead><tbody>`;
 
-  waTerms.forEach((x, i) => {
-    const key  = x.t;
-    const disp = (waMetrics[key] && waMetrics[key].disparos) || 0;
-    const conv = disp ? (x.wa / disp * 100).toFixed(1) + '%' : '—';
-    const dispCell = waEditing
-      ? `<input class="inp-metric" type="number" min="0" data-term="${key}" data-field="disparos" value="${disp || ''}" placeholder="0">`
-      : (disp ? disp.toLocaleString('pt-BR') : `<span style="color:var(--text3)">—</span>`);
+  vis.forEach(x => {
+    const key = x.t;
+    const m   = waMetrics[key] || {};
+    const disp = m.disparos  || 0;
+    const abr  = m.aberturas || 0;
+    const clk  = m.cliques   || 0;
+    const pAbr  = disp ? (abr / disp * 100).toFixed(1) + '%' : '—';
+    const pClk  = disp ? (clk / disp * 100).toFixed(1) + '%' : '—';
+    const pConv = disp ? (x.wa / disp * 100).toFixed(1) + '%' : '—';
+
+    function cell(field, val) {
+      if (!waEditing) return val ? val.toLocaleString('pt-BR') : `<span style="color:var(--text3)">—</span>`;
+      return `<input class="inp-metric" type="number" min="0" data-term="${key}" data-field="${field}" value="${val || ''}" placeholder="0">`;
+    }
+
     h += `<tr>
       <td style="padding-left:0">${lbl(key)}</td>
-      <td class="r">${dispCell}</td>
-      <td class="r" style="color:#1D9E75">${x.wa.toLocaleString('pt-BR')}</td>
-      <td class="r" style="color:${disp ? 'var(--accent)' : 'var(--text3)'};font-weight:${disp ? 500 : 400}">${conv}</td>
+      <td class="r">${cell('disparos', disp)}</td>
+      <td class="r">${cell('aberturas', abr)}</td>
+      <td class="r" style="color:${disp?'var(--text2)':'var(--text3)'}">${pAbr}</td>
+      <td class="r">${cell('cliques', clk)}</td>
+      <td class="r" style="color:${disp?'var(--text2)':'var(--text3)'}">${pClk}</td>
+      <td class="r" style="color:#1D9E75;font-weight:500">${x.wa.toLocaleString('pt-BR')}</td>
+      <td class="r" style="color:${disp?'var(--accent)':'var(--text3)'};font-weight:${disp?500:400}">${pConv}</td>
     </tr>`;
   });
 
   el.innerHTML = h + '</tbody>';
+  if (!waEditing) buildPager('pgWaSend', 'wa-send', waTerms.length);
+  else { const pg = document.getElementById('pgWaSend'); if (pg) pg.innerHTML = ''; }
   updateEditBtns('wa');
 }
 
