@@ -274,6 +274,12 @@
     <div class="chart-wrap" style="height:200px;margin-bottom:20px"><canvas id="cvDia"></canvas></div>
     <div id="divDia"></div>
     <div id="pgDia"></div>
+    <!-- Métricas manuais por disparo -->
+    <div style="margin-top:28px;margin-bottom:10px">
+      <span style="font-size:12px;font-weight:500;color:var(--text2)">Disparos enviados · WA e Email</span>
+      <span style="font-size:10.5px;color:var(--text3);margin-left:8px">Disparados/Entregues · Aberturas · Cliques</span>
+    </div>
+    <div id="wrapMetrics" class="chart-wrap" style="display:none"><canvas id="cvMetrics"></canvas></div>
   </div>
 
   <!-- Compras -->
@@ -358,7 +364,7 @@ const H = [
 // ─────────────────────────────────────────────────────────────────────────
 // ESTADO
 // ─────────────────────────────────────────────────────────────────────────
-let crmChart = null, waChart = null, emChart = null, diaChart = null;
+let crmChart = null, waChart = null, emChart = null, diaChart = null, metricsChart = null;
 let liveData = null;
 let activeTab = 'crm';
 const PAGE = { crm:1, wa:1, 'wa-send':1, em:1, estats:1, dia:1, comp:1 };
@@ -543,7 +549,7 @@ function reRenderTab() {
   if (activeTab === 'crm')  renderCrmChart(terms);
   if (activeTab === 'wa')   { renderWaChart(terms); renderWaSends(terms); }
   if (activeTab === 'em')   { renderEmChart(terms); renderEmStats(terms); }
-  if (activeTab === 'dia')  { renderDiaChart(byday); renderDiaTable(byday); }
+  if (activeTab === 'dia')  { renderDiaChart(byday); renderDiaTable(byday); renderMetricsChart(); }
   if (activeTab === 'comp') renderCompTable();
 }
 
@@ -683,6 +689,7 @@ function renderAll(data) {
   renderEmStats(terms);
   renderDiaChart(byday);
   renderDiaTable(byday);
+  renderMetricsChart();
   renderCompTable();
   renderHeatmap();
 }
@@ -857,6 +864,31 @@ function renderDiaChart(byDay) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// MÉTRICAS MANUAIS AGREGADAS POR DIA
+// ─────────────────────────────────────────────────────────────────────────
+function metricsByDay() {
+  const out = {};
+  const add = (d, disp, conv) => {
+    out[d] = out[d] || { disp: 0, conv: 0 };
+    out[d].disp += disp;
+    out[d].conv += conv;
+  };
+  Object.entries(waMetrics).forEach(([k, m]) => {
+    const d = parseTermDate(lbl(k));
+    if (d && m.disparos) add(d, m.disparos, 0);
+  });
+  Object.entries(emailMetrics).forEach(([k, m]) => {
+    const d = parseTermDate(lbl(k));
+    if (d && m.entregues) add(d, m.entregues, 0);
+  });
+  CONV.forEach(c => {
+    const d = parseTermDate(c.t);
+    if (d && c.d) add(d, 0, c.d);
+  });
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // TABELA POR DIA
 // ─────────────────────────────────────────────────────────────────────────
 function renderDiaTable(byDay) {
@@ -867,29 +899,37 @@ function renderDiaTable(byDay) {
 
   let acum = sorted.slice(0, (PAGE.dia-1)*(PAGE_SIZE.dia||10)).reduce((s,[,v]) => s+v.wa+v.em, 0);
 
+  const mbd = metricsByDay();
+
   let h = `<thead><tr>
     <th>Dia</th><th></th>
     <th class="r">WhatsApp</th><th class="r">Email</th>
-    <th class="r">Total</th><th class="r">Acumulado</th>
-    <th style="width:28%">Volume</th>
+    <th class="r">Total</th>
+    <th class="r" style="color:var(--text2)">Disparos</th>
+    <th class="r" style="color:var(--text2)">Compras</th>
+    <th class="r">Acumulado</th>
+    <th style="width:22%">Volume</th>
   </tr></thead><tbody>`;
 
   vis.forEach(([date, v]) => {
-    const tot = v.wa + v.em;
+    const tot  = v.wa + v.em;
     acum += tot;
-    const dt  = new Date(date + 'T12:00:00');
-    const ds  = DS[dt.getDay()];
-    const fmt = dt.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
+    const dt   = new Date(date + 'T12:00:00');
+    const ds   = DS[dt.getDay()];
+    const fmt  = dt.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
     const peak = tot === maxTot;
     const wknd = ds === 'sáb' || ds === 'dom';
     const wPct = Math.round(v.wa / maxTot * 100);
     const ePct = Math.round(v.em / maxTot * 100);
+    const md   = mbd[date] || { disp: 0, conv: 0 };
     h += `<tr style="${peak ? 'background:var(--bg2)' : ''}">
       <td style="font-weight:${peak?600:400};padding-left:0">${fmt}</td>
       <td style="font-size:11px;color:${wknd ? '#7F77DD' : 'var(--text3)'};">${ds}</td>
       <td class="r" style="color:${v.wa?'#1D9E75':'var(--text3)'};">${v.wa||'—'}</td>
       <td class="r" style="color:${v.em?'#185FA5':'var(--text3)'};">${v.em||'—'}</td>
       <td class="r" style="font-weight:${peak?600:500};">${tot}</td>
+      <td class="r" style="color:${md.disp?'var(--text2)':'var(--text3)'};">${md.disp ? md.disp.toLocaleString('pt-BR') : '—'}</td>
+      <td class="r" style="color:${md.conv?'#F59E0B':'var(--text3)'};">${md.conv || '—'}</td>
       <td class="r" style="color:var(--text2);">${acum.toLocaleString('pt-BR')}</td>
       <td style="padding-right:0">
         <div style="display:flex;height:8px;border-radius:3px;overflow:hidden;gap:1px">
@@ -900,18 +940,91 @@ function renderDiaTable(byDay) {
     </tr>`;
   });
 
-  const tWA = sorted.reduce((s,[,v]) => s+v.wa, 0);
-  const tEM = sorted.reduce((s,[,v]) => s+v.em, 0);
+  const tWA   = sorted.reduce((s,[,v]) => s+v.wa, 0);
+  const tEM   = sorted.reduce((s,[,v]) => s+v.em, 0);
+  const tDisp = Object.values(mbd).reduce((s,v) => s+v.disp, 0);
+  const tConv = Object.values(mbd).reduce((s,v) => s+v.conv, 0);
   h += `<tr>
     <td colspan="2" style="font-weight:500;color:var(--text2);padding-left:0;border-top:1px solid var(--border)">Total</td>
     <td class="r" style="font-weight:500;color:#1D9E75;border-top:1px solid var(--border)">${tWA.toLocaleString('pt-BR')}</td>
     <td class="r" style="font-weight:500;color:#185FA5;border-top:1px solid var(--border)">${tEM.toLocaleString('pt-BR')}</td>
     <td class="r" style="font-weight:600;border-top:1px solid var(--border)">${(tWA+tEM).toLocaleString('pt-BR')}</td>
+    <td class="r" style="font-weight:500;color:var(--text2);border-top:1px solid var(--border)">${tDisp ? tDisp.toLocaleString('pt-BR') : '—'}</td>
+    <td class="r" style="font-weight:500;color:#F59E0B;border-top:1px solid var(--border)">${tConv || '—'}</td>
     <td colspan="2" style="border-top:1px solid var(--border)"></td>
   </tr>`;
 
   document.getElementById('divDia').innerHTML = '<table>' + h + '</tbody></table>';
   buildPager('pgDia', 'dia', sorted.length);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// GRÁFICO DE MÉTRICAS MANUAIS (WA + Email)
+// ─────────────────────────────────────────────────────────────────────────
+function renderMetricsChart() {
+  if (metricsChart) { metricsChart.destroy(); metricsChart = null; }
+  const wrap = document.getElementById('wrapMetrics');
+  const el   = document.getElementById('cvMetrics');
+  if (!el || !wrap) return;
+
+  // Coleta termos WA com disparos preenchidos
+  const waRows = Object.entries(waMetrics)
+    .filter(([, m]) => m.disparos)
+    .map(([k, m]) => ({ t: lbl(k), disp: m.disparos, abr: m.aberturas||0, clk: m.cliques||0, ch: 'wa' }))
+    .sort((a, b) => b.disp - a.disp);
+
+  // Coleta termos Email com entregues preenchidos
+  const emRows = Object.entries(emailMetrics)
+    .filter(([, m]) => m.entregues)
+    .map(([k, m]) => ({ t: lbl(k), disp: m.entregues, abr: m.aberturas||0, clk: m.cliques||0, ch: 'em' }))
+    .sort((a, b) => b.disp - a.disp);
+
+  const merged = [...waRows, ...emRows];
+  if (merged.length === 0) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  wrap.style.height  = Math.max(160, merged.length * 28) + 'px';
+
+  const labels  = merged.map(x => x.t);
+  const dispVal = merged.map(x => x.disp);
+  const abrVal  = merged.map(x => x.abr);
+  const clkVal  = merged.map(x => x.clk);
+  const baseClr = merged.map(x => x.ch === 'wa' ? '#1D9E75' : '#185FA5');
+  const abrClr  = merged.map(x => x.ch === 'wa' ? '#0F6E56' : '#0D3D73');
+  const clkClr  = merged.map(x => x.ch === 'wa' ? '#5DCAA5' : '#4A90D9');
+
+  metricsChart = new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Disparados/Entregues', data: dispVal, backgroundColor: baseClr, borderRadius: 3, barThickness: 8 },
+        { label: 'Aberturas',            data: abrVal,  backgroundColor: abrClr,  borderRadius: 2, barThickness: 4 },
+        { label: 'Cliques',              data: clkVal,  backgroundColor: clkClr,  borderRadius: 2, barThickness: 4 }
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, position: 'top', labels: { color: TC, font: { size: 10 }, boxWidth: 10, padding: 12 } },
+        tooltip: {
+          callbacks: {
+            title: c => c[0].label,
+            afterBody: c => {
+              const x = merged[c[0].dataIndex];
+              const canal = x.ch === 'wa' ? 'WhatsApp' : 'Email';
+              const pAbr  = x.disp ? (x.abr / x.disp * 100).toFixed(1) + '%' : '—';
+              const pClk  = x.disp ? (x.clk / x.disp * 100).toFixed(1) + '%' : '—';
+              return [canal, `Disp/Ent: ${x.disp.toLocaleString('pt-BR')}`, `Abert.: ${x.abr} (${pAbr})`, `Cliques: ${x.clk} (${pClk})`];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: GC }, ticks: { color: TC, font: { size: 10 } } },
+        y: { ticks: { color: TC, font: { size: 11 } } }
+      }
+    }
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1029,11 +1142,16 @@ function renderWaSends(terms) {
   // ordenação
   const sf = waSendSort.f;
   waTerms.sort((a, b) => {
+    const ma = waMetrics[a.t]||{}, mb = waMetrics[b.t]||{};
+    const da = ma.disparos||0, db = mb.disparos||0;
     let va, vb;
-    if (sf === 'disparos')  { va = (waMetrics[a.t]||{}).disparos||0;  vb = (waMetrics[b.t]||{}).disparos||0; }
-    else if (sf === 'aberturas') { va = (waMetrics[a.t]||{}).aberturas||0; vb = (waMetrics[b.t]||{}).aberturas||0; }
-    else if (sf === 'cliques')   { va = (waMetrics[a.t]||{}).cliques||0;   vb = (waMetrics[b.t]||{}).cliques||0; }
+    if      (sf === 'disparos')  { va = da; vb = db; }
+    else if (sf === 'aberturas') { va = ma.aberturas||0; vb = mb.aberturas||0; }
+    else if (sf === 'cliques')   { va = ma.cliques||0;   vb = mb.cliques||0; }
     else if (sf === 'insc')      { va = a.wa; vb = b.wa; }
+    else if (sf === 'pAbr')      { va = da ? (ma.aberturas||0)/da : 0; vb = db ? (mb.aberturas||0)/db : 0; }
+    else if (sf === 'pClk')      { va = da ? (ma.cliques||0)/da   : 0; vb = db ? (mb.cliques||0)/db   : 0; }
+    else if (sf === 'pConv')     { va = da ? a.wa/da : 0; vb = db ? b.wa/db : 0; }
     else                         { va = a.wa; vb = b.wa; return vb - va; }
     return (vb - va) * waSendSort.d;
   });
@@ -1050,11 +1168,11 @@ function renderWaSends(terms) {
     <th>Disparo</th>
     ${th('Disparados','disparos')}
     ${th('Aberturas','aberturas')}
-    <th class="r">% Abert.</th>
+    ${th('% Abert.','pAbr')}
     ${th('Cliques','cliques')}
-    <th class="r">% Clique</th>
+    ${th('% Clique','pClk')}
     ${th('Inscrições','insc')}
-    <th class="r">% Conv.</th>
+    ${th('% Conv.','pConv')}
   </tr></thead><tbody>`;
 
   vis.forEach(x => {
@@ -1101,11 +1219,16 @@ function renderEmStats(terms) {
   // ordenação
   const sf = emStatsSort.f;
   emTerms.sort((a, b) => {
+    const ma = emailMetrics[a.t]||{}, mb = emailMetrics[b.t]||{};
+    const ea = ma.entregues||0, eb = mb.entregues||0;
     let va, vb;
-    if (sf === 'entregues')  { va = (emailMetrics[a.t]||{}).entregues||0;  vb = (emailMetrics[b.t]||{}).entregues||0; }
-    else if (sf === 'aberturas') { va = (emailMetrics[a.t]||{}).aberturas||0; vb = (emailMetrics[b.t]||{}).aberturas||0; }
-    else if (sf === 'cliques')   { va = (emailMetrics[a.t]||{}).cliques||0;   vb = (emailMetrics[b.t]||{}).cliques||0; }
+    if      (sf === 'entregues') { va = ea; vb = eb; }
+    else if (sf === 'aberturas') { va = ma.aberturas||0; vb = mb.aberturas||0; }
+    else if (sf === 'cliques')   { va = ma.cliques||0;   vb = mb.cliques||0; }
     else if (sf === 'insc')      { va = a.em; vb = b.em; }
+    else if (sf === 'pAbr')      { va = ea ? (ma.aberturas||0)/ea : 0; vb = eb ? (mb.aberturas||0)/eb : 0; }
+    else if (sf === 'pClk')      { va = ea ? (ma.cliques||0)/ea   : 0; vb = eb ? (mb.cliques||0)/eb   : 0; }
+    else if (sf === 'pConv')     { va = ea ? a.em/ea : 0; vb = eb ? b.em/eb : 0; }
     else                         { va = a.em; vb = b.em; return vb - va; }
     return (vb - va) * emStatsSort.d;
   });
@@ -1122,11 +1245,11 @@ function renderEmStats(terms) {
     <th>Disparo</th>
     ${th('Entregues','entregues')}
     ${th('Aberturas','aberturas')}
-    <th class="r">% Abert.</th>
+    ${th('% Abert.','pAbr')}
     ${th('Cliques','cliques')}
-    <th class="r">% Clique</th>
+    ${th('% Clique','pClk')}
     ${th('Inscrições','insc')}
-    <th class="r">% Conv.</th>
+    ${th('% Conv.','pConv')}
   </tr></thead><tbody>`;
 
   vis.forEach(x => {
@@ -1217,6 +1340,7 @@ function saveEdit(type) {
   if (liveData) {
     const terms = filteredTerms(liveData);
     if (type === 'wa') renderWaSends(terms); else renderEmStats(terms);
+    if (activeTab === 'dia') { renderDiaTable(filteredByDay(liveData)); renderMetricsChart(); }
   }
   // flash "Salvo"
   const tagId = type === 'wa' ? 'waSavedTag' : 'emSavedTag';
@@ -1241,7 +1365,7 @@ function setTab(t) {
     if (t === 'crm')  renderCrmChart(terms);
     if (t === 'wa')   { renderWaChart(terms); renderWaSends(terms); }
     if (t === 'em')   { renderEmChart(terms); renderEmStats(terms); }
-    if (t === 'dia')  { renderDiaChart(byday); renderDiaTable(byday); }
+    if (t === 'dia')  { renderDiaChart(byday); renderDiaTable(byday); renderMetricsChart(); }
     if (t === 'comp') renderCompTable();
   }
 }
