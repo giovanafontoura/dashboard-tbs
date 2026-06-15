@@ -28,27 +28,28 @@ export default async function handler(req, res) {
       if (isWA) waIds.add(String(id));
       if (isEM) emIds.add(String(id));
 
-      const term = p.utm_term_tbs || 'sem_term';
-      const day  = p.tbs_2026__data_de_inscricao
-                     ? p.tbs_2026__data_de_inscricao.slice(0, 10)
-                     : null;
+      const waTerm = p.utm_term_tbs || 'sem_term';
+      const emTerm = p.detalhamento_1_da_fonte__tbs_ || 'sem_term';
+      const day    = p.tbs_2026__data_de_inscricao
+                       ? p.tbs_2026__data_de_inscricao.slice(0, 10)
+                       : null;
 
       if (isWA) {
-        waByTerm[term] = (waByTerm[term] || 0) + 1;
+        waByTerm[waTerm] = (waByTerm[waTerm] || 0) + 1;
         if (day) {
           byDay[day] = byDay[day] || { wa: 0, em: 0 };
           byDay[day].wa++;
           byDayByTerm[day] = byDayByTerm[day] || { wa: {}, em: {} };
-          byDayByTerm[day].wa[term] = (byDayByTerm[day].wa[term] || 0) + 1;
+          byDayByTerm[day].wa[waTerm] = (byDayByTerm[day].wa[waTerm] || 0) + 1;
         }
       }
       if (isEM) {
-        emByTerm[term] = (emByTerm[term] || 0) + 1;
+        emByTerm[emTerm] = (emByTerm[emTerm] || 0) + 1;
         if (day) {
           byDay[day] = byDay[day] || { wa: 0, em: 0 };
           byDay[day].em++;
           byDayByTerm[day] = byDayByTerm[day] || { wa: {}, em: {} };
-          byDayByTerm[day].em[term] = (byDayByTerm[day].em[term] || 0) + 1;
+          byDayByTerm[day].em[emTerm] = (byDayByTerm[day].em[emTerm] || 0) + 1;
         }
       }
     }
