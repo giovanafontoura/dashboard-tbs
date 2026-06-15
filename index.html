@@ -868,22 +868,24 @@ function renderDiaChart(byDay) {
 // ─────────────────────────────────────────────────────────────────────────
 function metricsByDay() {
   const out = {};
-  const add = (d, disp, conv) => {
-    out[d] = out[d] || { disp: 0, conv: 0 };
-    out[d].disp += disp;
+  const add = (d, wa, em, conv) => {
+    out[d] = out[d] || { disp: 0, wa: 0, em: 0, conv: 0 };
+    out[d].disp += wa + em;
+    out[d].wa   += wa;
+    out[d].em   += em;
     out[d].conv += conv;
   };
   Object.entries(waMetrics).forEach(([k, m]) => {
     const d = parseTermDate(lbl(k));
-    if (d && m.disparos) add(d, m.disparos, 0);
+    if (d && m.disparos)  add(d, m.disparos,  0, 0);
   });
   Object.entries(emailMetrics).forEach(([k, m]) => {
     const d = parseTermDate(lbl(k));
-    if (d && m.entregues) add(d, m.entregues, 0);
+    if (d && m.entregues) add(d, 0, m.entregues, 0);
   });
   CONV.forEach(c => {
     const d = parseTermDate(c.t);
-    if (d && c.d) add(d, 0, c.d);
+    if (d && c.d) add(d, 0, 0, c.d);
   });
   return out;
 }
@@ -967,61 +969,43 @@ function renderMetricsChart() {
   const el   = document.getElementById('cvMetrics');
   if (!el || !wrap) return;
 
-  // Coleta termos WA com disparos preenchidos
-  const waRows = Object.entries(waMetrics)
-    .filter(([, m]) => m.disparos)
-    .map(([k, m]) => ({ t: lbl(k), disp: m.disparos, abr: m.aberturas||0, clk: m.cliques||0, ch: 'wa' }))
-    .sort((a, b) => b.disp - a.disp);
+  const mbd = metricsByDay();
+  const sorted = Object.entries(mbd)
+    .filter(([, v]) => v.wa > 0 || v.em > 0)
+    .sort(([a], [b]) => a.localeCompare(b));
 
-  // Coleta termos Email com entregues preenchidos
-  const emRows = Object.entries(emailMetrics)
-    .filter(([, m]) => m.entregues)
-    .map(([k, m]) => ({ t: lbl(k), disp: m.entregues, abr: m.aberturas||0, clk: m.cliques||0, ch: 'em' }))
-    .sort((a, b) => b.disp - a.disp);
-
-  const merged = [...waRows, ...emRows];
-  if (merged.length === 0) { wrap.style.display = 'none'; return; }
+  if (sorted.length === 0) { wrap.style.display = 'none'; return; }
   wrap.style.display = '';
-  wrap.style.height  = Math.max(160, merged.length * 28) + 'px';
+  wrap.style.height  = '200px';
 
-  const labels  = merged.map(x => x.t);
-  const dispVal = merged.map(x => x.disp);
-  const abrVal  = merged.map(x => x.abr);
-  const clkVal  = merged.map(x => x.clk);
-  const baseClr = merged.map(x => x.ch === 'wa' ? '#1D9E75' : '#185FA5');
-  const abrClr  = merged.map(x => x.ch === 'wa' ? '#0F6E56' : '#0D3D73');
-  const clkClr  = merged.map(x => x.ch === 'wa' ? '#5DCAA5' : '#4A90D9');
+  const labels = sorted.map(([d]) => {
+    const dt = new Date(d + 'T12:00:00');
+    return dt.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
+  });
 
   metricsChart = new Chart(el.getContext('2d'), {
     type: 'bar',
     data: {
       labels,
       datasets: [
-        { label: 'Disparados/Entregues', data: dispVal, backgroundColor: baseClr, borderRadius: 3, barThickness: 8 },
-        { label: 'Aberturas',            data: abrVal,  backgroundColor: abrClr,  borderRadius: 2, barThickness: 4 },
-        { label: 'Cliques',              data: clkVal,  backgroundColor: clkClr,  borderRadius: 2, barThickness: 4 }
+        { label:'WhatsApp', data: sorted.map(([,v]) => v.wa), backgroundColor:'#1D9E75', borderRadius:3 },
+        { label:'Email',    data: sorted.map(([,v]) => v.em), backgroundColor:'#185FA5', borderRadius:3 }
       ]
     },
     options: {
-      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display: true, position: 'top', labels: { color: TC, font: { size: 10 }, boxWidth: 10, padding: 12 } },
-        tooltip: {
-          callbacks: {
-            title: c => c[0].label,
-            afterBody: c => {
-              const x = merged[c[0].dataIndex];
-              const canal = x.ch === 'wa' ? 'WhatsApp' : 'Email';
-              const pAbr  = x.disp ? (x.abr / x.disp * 100).toFixed(1) + '%' : '—';
-              const pClk  = x.disp ? (x.clk / x.disp * 100).toFixed(1) + '%' : '—';
-              return [canal, `Disp/Ent: ${x.disp.toLocaleString('pt-BR')}`, `Abert.: ${x.abr} (${pAbr})`, `Cliques: ${x.clk} (${pClk})`];
-            }
+        legend: { display:true, position:'top', labels:{ color:TC, font:{ size:10 }, boxWidth:10, padding:12 } },
+        tooltip: { callbacks: {
+          afterBody: c => {
+            const [, v] = sorted[c[0].dataIndex];
+            return [`Total: ${(v.wa + v.em).toLocaleString('pt-BR')}`];
           }
-        }
+        }}
       },
       scales: {
-        x: { grid: { color: GC }, ticks: { color: TC, font: { size: 10 } } },
-        y: { ticks: { color: TC, font: { size: 11 } } }
+        x: { stacked:true, grid:{ color:GC }, ticks:{ color:TC, font:{ size:10 } } },
+        y: { stacked:true, grid:{ color:GC }, ticks:{ color:TC, font:{ size:10 } } }
       }
     }
   });
