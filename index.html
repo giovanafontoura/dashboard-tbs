@@ -871,10 +871,19 @@ function metricsByDay() {
     const d = parseTermDate(lbl(k));
     if (d && m.entregues) ensure(d).dispEM  += m.entregues;
   });
-  CONV.forEach(c => {
-    const d = parseTermDate(c.t);
-    if (d && c.d) ensure(d).compras += c.d;
-  });
+  // compras por dia: usa dealsByTerm da API (ao vivo) ou CONV como fallback
+  const dealsSource = (liveData && liveData.dealsByTerm) || null;
+  if (dealsSource) {
+    Object.entries(dealsSource).forEach(([term, count]) => {
+      const d = parseTermDate(term);
+      if (d && count) ensure(d).compras += count;
+    });
+  } else {
+    CONV.forEach(c => {
+      const d = parseTermDate(c.t);
+      if (d && c.d) ensure(d).compras += c.d;
+    });
+  }
   return out;
 }
 
