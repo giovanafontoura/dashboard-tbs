@@ -16,6 +16,7 @@ export default async function handler(req, res) {
     const byDayByTerm = {};
     const waIds = new Set();
     const emIds = new Set();
+    const contactToTerm = {}; // contactId -> utm_term_tbs
 
     for (const { id, properties: p } of contacts) {
       const fonte = (p.fonte__tbs_ || '').toLowerCase();
@@ -29,6 +30,8 @@ export default async function handler(req, res) {
       if (isEM) emIds.add(String(id));
 
       const term = p.utm_term_tbs || 'sem_term';
+      contactToTerm[String(id)] = term;
+
       const day  = p.tbs_2026__data_de_inscricao
                      ? p.tbs_2026__data_de_inscricao.slice(0, 10)
                      : null;
@@ -53,7 +56,9 @@ export default async function handler(req, res) {
       }
     }
 
-    const dealsTotal = await fetchDealsCount(token, waIds, emIds);
+    const allContactIds = new Set([...waIds, ...emIds]);
+    const { total: dealsTotal, byTerm: dealsByTerm } =
+      await fetchDealsWithTerms(token, allContactIds, contactToTerm);
 
     const totWA = Object.values(waByTerm).reduce((a, b) => a + b, 0);
     const totEM = Object.values(emByTerm).reduce((a, b) => a + b, 0);
@@ -63,6 +68,7 @@ export default async function handler(req, res) {
       emByTerm,
       byDay,
       byDayByTerm,
+      dealsByTerm,
       totals: {
         wa:    totWA,
         em:    totEM,
@@ -130,14 +136,13 @@ async function fetchAllContacts(token) {
   return all;
 }
 
-async function fetchDealsCount(token, waIds, emIds) {
-  const allContactIds = new Set([...waIds, ...emIds]);
+async function fetchDealsWithTerms(token, allContactIds, contactToTerm) {
   const HEADERS = {
     'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json'
   };
 
-  // Step 1: fetch all deal IDs in pipeline + stage
+  // Step 1: fetch all deal IDs in pipeline + stage "Negócio fechado"
   const dealIds = [];
   let after;
   do {
@@ -161,8 +166,10 @@ async function fetchDealsCount(token, waIds, emIds) {
     after = data.paging?.next?.after;
   } while (after);
 
-  // Step 2: for each batch of deals, check if any associated contact is WA/EM
-  let count = 0;
+  // Step 2: for each deal batch, find associated contacts and map to utm_term
+  let total = 0;
+  const byTerm = {};
+
   for (let i = 0; i < dealIds.length; i += 100) {
     if (i > 0) await sleep(300);
     const batch = dealIds.slice(i, i + 100);
@@ -173,11 +180,23 @@ async function fetchDealsCount(token, waIds, emIds) {
     });
     if (!resp.ok) continue;
     const data = await resp.json();
+
     for (const result of (data.results || [])) {
-      const cids = (result.to || []).map(t => String(t.toObjectId));
-      if (cids.some(cid => allContactIds.has(cid))) count++;
+      const matchingCids = (result.to || [])
+        .map(t => String(t.toObjectId))
+        .filter(cid => allContactIds.has(cid));
+
+      if (matchingCids.length === 0) continue;
+
+      total++;
+
+      // count this deal once per unique utm_term among its WA/EM contacts
+      const terms = new Set(matchingCids.map(cid => contactToTerm[cid] || 'sem_term'));
+      for (const term of terms) {
+        byTerm[term] = (byTerm[term] || 0) + 1;
+      }
     }
   }
 
-  return count;
+  return { total, byTerm };
 }

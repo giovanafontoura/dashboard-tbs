@@ -274,12 +274,6 @@
     <div class="chart-wrap" style="height:200px;margin-bottom:20px"><canvas id="cvDia"></canvas></div>
     <div id="divDia"></div>
     <div id="pgDia"></div>
-    <!-- Métricas manuais por disparo -->
-    <div style="margin-top:28px;margin-bottom:10px">
-      <span style="font-size:12px;font-weight:500;color:var(--text2)">Disparos enviados · WA e Email</span>
-      <span style="font-size:10.5px;color:var(--text3);margin-left:8px">Disparados/Entregues · Aberturas · Cliques</span>
-    </div>
-    <div id="wrapMetrics" class="chart-wrap" style="display:none"><canvas id="cvMetrics"></canvas></div>
   </div>
 
   <!-- Compras -->
@@ -868,24 +862,18 @@ function renderDiaChart(byDay) {
 // ─────────────────────────────────────────────────────────────────────────
 function metricsByDay() {
   const out = {};
-  const add = (d, wa, em, conv) => {
-    out[d] = out[d] || { disp: 0, wa: 0, em: 0, conv: 0 };
-    out[d].disp += wa + em;
-    out[d].wa   += wa;
-    out[d].em   += em;
-    out[d].conv += conv;
-  };
+  const ensure = d => { out[d] = out[d] || { dispWA: 0, dispEM: 0, compras: 0 }; return out[d]; };
   Object.entries(waMetrics).forEach(([k, m]) => {
     const d = parseTermDate(lbl(k));
-    if (d && m.disparos)  add(d, m.disparos,  0, 0);
+    if (d && m.disparos)  ensure(d).dispWA  += m.disparos;
   });
   Object.entries(emailMetrics).forEach(([k, m]) => {
     const d = parseTermDate(lbl(k));
-    if (d && m.entregues) add(d, 0, m.entregues, 0);
+    if (d && m.entregues) ensure(d).dispEM  += m.entregues;
   });
   CONV.forEach(c => {
     const d = parseTermDate(c.t);
-    if (d && c.d) add(d, 0, 0, c.d);
+    if (d && c.d) ensure(d).compras += c.d;
   });
   return out;
 }
@@ -896,7 +884,6 @@ function metricsByDay() {
 function renderDiaTable(byDay) {
   const DS = ['dom','seg','ter','qua','qui','sex','sáb'];
   const sorted = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
-  const maxTot = Math.max(...sorted.map(([,v]) => v.wa+v.em), 1);
   const vis = slicePage(sorted, 'dia');
 
   let acum = sorted.slice(0, (PAGE.dia-1)*(PAGE_SIZE.dia||10)).reduce((s,[,v]) => s+v.wa+v.em, 0);
@@ -905,12 +892,13 @@ function renderDiaTable(byDay) {
 
   let h = `<thead><tr>
     <th>Dia</th><th></th>
-    <th class="r">WhatsApp</th><th class="r">Email</th>
-    <th class="r">Total</th>
-    <th class="r" style="color:var(--text2)">Disparos</th>
-    <th class="r" style="color:var(--text2)">Compras</th>
+    <th class="r" style="color:#1D9E75">Disparo WA</th>
+    <th class="r" style="color:#1D9E75">Conv. WA</th>
+    <th class="r" style="color:#185FA5">Disparo Email</th>
+    <th class="r" style="color:#185FA5">Conv. Email</th>
+    <th class="r">Inscritos Total</th>
+    <th class="r" style="color:#F59E0B">Compras</th>
     <th class="r">Acumulado</th>
-    <th style="width:22%">Volume</th>
   </tr></thead><tbody>`;
 
   vis.forEach(([date, v]) => {
@@ -919,41 +907,36 @@ function renderDiaTable(byDay) {
     const dt   = new Date(date + 'T12:00:00');
     const ds   = DS[dt.getDay()];
     const fmt  = dt.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
-    const peak = tot === maxTot;
     const wknd = ds === 'sáb' || ds === 'dom';
-    const wPct = Math.round(v.wa / maxTot * 100);
-    const ePct = Math.round(v.em / maxTot * 100);
-    const md   = mbd[date] || { disp: 0, conv: 0 };
-    h += `<tr style="${peak ? 'background:var(--bg2)' : ''}">
-      <td style="font-weight:${peak?600:400};padding-left:0">${fmt}</td>
+    const md   = mbd[date] || { dispWA: 0, dispEM: 0, compras: 0 };
+    h += `<tr>
+      <td style="padding-left:0">${fmt}</td>
       <td style="font-size:11px;color:${wknd ? '#7F77DD' : 'var(--text3)'};">${ds}</td>
+      <td class="r" style="color:${md.dispWA?'#1D9E75':'var(--text3)'};">${md.dispWA ? md.dispWA.toLocaleString('pt-BR') : '—'}</td>
       <td class="r" style="color:${v.wa?'#1D9E75':'var(--text3)'};">${v.wa||'—'}</td>
+      <td class="r" style="color:${md.dispEM?'#185FA5':'var(--text3)'};">${md.dispEM ? md.dispEM.toLocaleString('pt-BR') : '—'}</td>
       <td class="r" style="color:${v.em?'#185FA5':'var(--text3)'};">${v.em||'—'}</td>
-      <td class="r" style="font-weight:${peak?600:500};">${tot}</td>
-      <td class="r" style="color:${md.disp?'var(--text2)':'var(--text3)'};">${md.disp ? md.disp.toLocaleString('pt-BR') : '—'}</td>
-      <td class="r" style="color:${md.conv?'#F59E0B':'var(--text3)'};">${md.conv || '—'}</td>
+      <td class="r" style="font-weight:500;">${tot || '—'}</td>
+      <td class="r" style="color:${md.compras?'#F59E0B':'var(--text3)'};">${md.compras || '—'}</td>
       <td class="r" style="color:var(--text2);">${acum.toLocaleString('pt-BR')}</td>
-      <td style="padding-right:0">
-        <div style="display:flex;height:8px;border-radius:3px;overflow:hidden;gap:1px">
-          ${v.wa ? `<div style="width:${wPct}%;background:#1D9E75;min-width:2px"></div>` : ''}
-          ${v.em ? `<div style="width:${ePct}%;background:#185FA5;min-width:2px"></div>` : ''}
-        </div>
-      </td>
     </tr>`;
   });
 
-  const tWA   = sorted.reduce((s,[,v]) => s+v.wa, 0);
-  const tEM   = sorted.reduce((s,[,v]) => s+v.em, 0);
-  const tDisp = Object.values(mbd).reduce((s,v) => s+v.disp, 0);
-  const tConv = Object.values(mbd).reduce((s,v) => s+v.conv, 0);
+  const tWA     = sorted.reduce((s,[,v]) => s+v.wa, 0);
+  const tEM     = sorted.reduce((s,[,v]) => s+v.em, 0);
+  const tDispWA = Object.values(mbd).reduce((s,v) => s+v.dispWA, 0);
+  const tDispEM = Object.values(mbd).reduce((s,v) => s+v.dispEM, 0);
+  const tComp   = Object.values(mbd).reduce((s,v) => s+v.compras, 0);
+  const bt = 'border-top:1px solid var(--border)';
   h += `<tr>
-    <td colspan="2" style="font-weight:500;color:var(--text2);padding-left:0;border-top:1px solid var(--border)">Total</td>
-    <td class="r" style="font-weight:500;color:#1D9E75;border-top:1px solid var(--border)">${tWA.toLocaleString('pt-BR')}</td>
-    <td class="r" style="font-weight:500;color:#185FA5;border-top:1px solid var(--border)">${tEM.toLocaleString('pt-BR')}</td>
-    <td class="r" style="font-weight:600;border-top:1px solid var(--border)">${(tWA+tEM).toLocaleString('pt-BR')}</td>
-    <td class="r" style="font-weight:500;color:var(--text2);border-top:1px solid var(--border)">${tDisp ? tDisp.toLocaleString('pt-BR') : '—'}</td>
-    <td class="r" style="font-weight:500;color:#F59E0B;border-top:1px solid var(--border)">${tConv || '—'}</td>
-    <td colspan="2" style="border-top:1px solid var(--border)"></td>
+    <td colspan="2" style="font-weight:500;color:var(--text2);padding-left:0;${bt}">Total</td>
+    <td class="r" style="font-weight:500;color:#1D9E75;${bt}">${tDispWA ? tDispWA.toLocaleString('pt-BR') : '—'}</td>
+    <td class="r" style="font-weight:500;color:#1D9E75;${bt}">${tWA.toLocaleString('pt-BR')}</td>
+    <td class="r" style="font-weight:500;color:#185FA5;${bt}">${tDispEM ? tDispEM.toLocaleString('pt-BR') : '—'}</td>
+    <td class="r" style="font-weight:500;color:#185FA5;${bt}">${tEM.toLocaleString('pt-BR')}</td>
+    <td class="r" style="font-weight:600;${bt}">${(tWA+tEM).toLocaleString('pt-BR')}</td>
+    <td class="r" style="font-weight:500;color:#F59E0B;${bt}">${tComp || '—'}</td>
+    <td class="r" style="${bt}"></td>
   </tr>`;
 
   document.getElementById('divDia').innerHTML = '<table>' + h + '</tbody></table>';
@@ -961,9 +944,9 @@ function renderDiaTable(byDay) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// GRÁFICO DE MÉTRICAS MANUAIS (WA + Email)
+// GRÁFICO DE MÉTRICAS MANUAIS (removido — dados integrados na tabela Por dia)
 // ─────────────────────────────────────────────────────────────────────────
-function renderMetricsChart() {
+function renderMetricsChart() { return;
   if (metricsChart) { metricsChart.destroy(); metricsChart = null; }
   const wrap = document.getElementById('wrapMetrics');
   const el   = document.getElementById('cvMetrics');
@@ -1016,7 +999,15 @@ function renderMetricsChart() {
 // ─────────────────────────────────────────────────────────────────────────
 function renderCompTable() {
   const q = searchQ.comp;
+  const liveWA    = (liveData && liveData.waByTerm)    || {};
+  const liveEM    = (liveData && liveData.emByTerm)    || {};
+  const liveDeals = (liveData && liveData.dealsByTerm) || {};
   let rows = filteredConv()
+    .map(r => ({
+      ...r,
+      insc: r.ch === 'WA' ? (liveWA[r.t] ?? r.insc) : (liveEM[r.t] ?? r.insc),
+      d:    liveDeals[r.t] ?? r.d
+    }))
     .filter(r => !q || r.t.toLowerCase().includes(q));
 
   // ordenação
