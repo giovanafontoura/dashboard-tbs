@@ -8,10 +8,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const [contacts, buyersResult] = await Promise.all([
-      fetchAllContacts(token),
-      fetchDealsWithTerms(token)
-    ]);
+    // Contacts é crítico — se falhar, retorna erro para o frontend usar DEMO
+    const contacts = await fetchAllContacts(token);
+
+    // Deals é não-fatal — se falhar, continua sem dados de compras
+    let buyersResult = { total: 0, byTerm: {} };
+    try {
+      buyersResult = await fetchDealsWithTerms(token);
+    } catch (dealsErr) {
+      console.error('Deals fetch failed (non-fatal):', dealsErr.message);
+    }
 
     const waByTerm    = {};
     const emByTerm    = {};
@@ -114,16 +120,15 @@ async function fetchAllContacts(token) {
   return all;
 }
 
-// Busca deals "Negócio Fechado" na pipeline "The Best School",
-// verifica contatos associados e qualifica por fonte WA/Email ou utm_term específico
 async function fetchDealsWithTerms(token) {
   const HEADERS = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
   // 1. Todos os deals na etapa Negócio Fechado
+  console.log('[deals] buscando deal IDs...');
   const dealIds = [];
   let after;
   do {
-    if (after) await sleep(300);
+    if (after) await sleep(150);
     const resp = await fetch('https://api.hubapi.com/crm/v3/objects/deals/search', {
       method: 'POST',
       headers: HEADERS,
@@ -143,6 +148,7 @@ async function fetchDealsWithTerms(token) {
     after = data.paging?.next?.after;
   } while (after);
 
+  console.log(`[deals] ${dealIds.length} deals encontrados`);
   if (dealIds.length === 0) return { total: 0, byTerm: {} };
 
   // 2. Contatos associados a cada deal
@@ -150,34 +156,37 @@ async function fetchDealsWithTerms(token) {
   const allAssocCids = new Set();
 
   for (let i = 0; i < dealIds.length; i += 100) {
-    if (i > 0) await sleep(300);
+    if (i > 0) await sleep(150);
     const batch = dealIds.slice(i, i + 100);
     const resp = await fetch('https://api.hubapi.com/crm/v4/associations/deals/contacts/batch/read', {
       method: 'POST',
       headers: HEADERS,
       body: JSON.stringify({ inputs: batch.map(id => ({ id: String(id) })) })
     });
-    if (!resp.ok) continue;
+    if (!resp.ok) { console.error(`[assoc] erro ${resp.status}`); continue; }
     const data = await resp.json();
     for (const result of (data.results || [])) {
       const cids = (result.to || []).map(t => String(t.toObjectId));
-      dealToContacts[String(result.from.id)] = cids;
+      dealToContacts[String(result.from?.id || '')] = cids;
       cids.forEach(cid => allAssocCids.add(cid));
     }
   }
+
+  console.log(`[deals] ${allAssocCids.size} contatos associados`);
 
   // 3. Propriedades dos contatos associados (batch read)
   const contactProps = {};
   const cidList = [...allAssocCids];
 
   for (let i = 0; i < cidList.length; i += 100) {
-    if (i > 0) await sleep(300);
+    if (i > 0) await sleep(150);
     const batch = cidList.slice(i, i + 100);
     const resp = await fetch('https://api.hubapi.com/crm/v3/objects/contacts/batch/read', {
       method: 'POST',
       headers: HEADERS,
       body: JSON.stringify({
         inputs: batch.map(id => ({ id })),
+        idProperty: 'hs_object_id',
         properties: ['utm_term_tbs', 'fonte__tbs_', 'detalhamento_1_da_fonte__tbs_']
       })
     });
