@@ -830,6 +830,7 @@ function barOpts(tab, vis, full, afterBody) {
 function renderDiaChart(byDay) {
   if (diaChart) { diaChart.destroy(); diaChart = null; }
   const sorted = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
+  const mbd = metricsByDay();
   const labels = sorted.map(([d]) => {
     const dt = new Date(d + 'T12:00:00');
     return dt.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
@@ -839,19 +840,29 @@ function renderDiaChart(byDay) {
     data: {
       labels,
       datasets: [
-        { label:'WhatsApp', data:sorted.map(([,v]) => v.wa), backgroundColor:'#1D9E75', borderRadius:3 },
-        { label:'Email',    data:sorted.map(([,v]) => v.em), backgroundColor:'#185FA5', borderRadius:3 }
+        { label:'WhatsApp', data:sorted.map(([,v]) => v.wa), backgroundColor:'#1D9E75', borderRadius:3, stack:'inscritos', yAxisID:'y' },
+        { label:'Email',    data:sorted.map(([,v]) => v.em), backgroundColor:'#185FA5', borderRadius:3, stack:'inscritos', yAxisID:'y' },
+        { label:'Compras',  data:sorted.map(([d]) => (mbd[d] || {compras:0}).compras || null),
+          type:'line', borderColor:'#F59E0B', backgroundColor:'#F59E0B44',
+          borderWidth:2, pointRadius:4, pointBackgroundColor:'#F59E0B',
+          fill:false, tension:0.3, yAxisID:'y2' }
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display:true, position:'top', labels:{ color:TC, font:{ size:10 }, boxWidth:10, padding:12 } },
-        tooltip: { callbacks: { afterBody: c => ['Total: ' + (sorted[c[0].dataIndex][1].wa + sorted[c[0].dataIndex][1].em)] } }
+        tooltip: { callbacks: { afterBody: c => {
+          const idx = c[0].dataIndex;
+          return ['Inscritos: ' + (sorted[idx][1].wa + sorted[idx][1].em),
+                  'Compras: ' + ((mbd[sorted[idx][0]] || {compras:0}).compras || 0)];
+        }}}
       },
       scales: {
-        x: { stacked:true, grid:{ color:GC }, ticks:{ color:TC, font:{ size:10 } } },
-        y: { stacked:true, grid:{ color:GC }, ticks:{ color:TC, font:{ size:10 } } }
+        x:  { stacked:true, grid:{ color:GC }, ticks:{ color:TC, font:{ size:10 } } },
+        y:  { stacked:true, grid:{ color:GC }, ticks:{ color:TC, font:{ size:10 } }, position:'left' },
+        y2: { position:'right', beginAtZero:true, grid:{ drawOnChartArea:false },
+              ticks:{ color:'#F59E0B', font:{ size:10 } } }
       }
     }
   });

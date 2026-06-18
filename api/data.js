@@ -8,10 +8,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Busca paralela: inscritos + compradores
     const [contacts, buyersResult] = await Promise.all([
       fetchAllContacts(token),
-      fetchBuyersByTerm(token)
+      fetchDealsWithTerms(token)
     ]);
 
     const waByTerm    = {};
@@ -78,6 +77,18 @@ export default async function handler(req, res) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// Contatos qualificados: fonte WA ou Email OU utm_term = whatsapp/email/hs_mail/hs_automation
+function qualifyContact(p) {
+  if (!p) return false;
+  const fonte = (p.fonte__tbs_ || '').toLowerCase();
+  const det   = (p.detalhamento_1_da_fonte__tbs_ || '').toLowerCase();
+  const term  = (p.utm_term_tbs || '').toLowerCase();
+  if (fonte === 'organic social' && det === 'whatsapp') return true;
+  if (fonte === 'email marketing') return true;
+  if (['whatsapp', 'email', 'hs_mail', 'hs_automation'].includes(term)) return true;
+  return false;
+}
+
 async function fetchAllContacts(token) {
   const ENDPOINT = 'https://api.hubapi.com/crm/v3/objects/contacts/search';
   const HEADERS  = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -103,55 +114,95 @@ async function fetchAllContacts(token) {
   return all;
 }
 
-// Busca compradores diretamente pelo campo tbschool__data_do_pagamento
-// Não depende de inscrito_tbs_2026 nem de associações de deals
-async function fetchBuyersByTerm(token) {
-  const ENDPOINT = 'https://api.hubapi.com/crm/v3/objects/contacts/search';
-  const HEADERS  = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+// Busca deals "Negócio Fechado" na pipeline "The Best School",
+// verifica contatos associados e qualifica por fonte WA/Email ou utm_term específico
+async function fetchDealsWithTerms(token) {
+  const HEADERS = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
-  const byTerm = {};
-  let total = 0;
+  // 1. Todos os deals na etapa Negócio Fechado
+  const dealIds = [];
   let after;
-
   do {
     if (after) await sleep(300);
-    const resp = await fetch(ENDPOINT, {
+    const resp = await fetch('https://api.hubapi.com/crm/v3/objects/deals/search', {
       method: 'POST',
       headers: HEADERS,
       body: JSON.stringify({
-        filterGroups: [
-          // WA: Organic Social + WhatsApp + data_do_pagamento preenchida
-          {
-            filters: [
-              { propertyName: 'tbschool__data_do_pagamento', operator: 'HAS_PROPERTY' },
-              { propertyName: 'fonte__tbs_',                 operator: 'EQ', value: 'Organic Social' },
-              { propertyName: 'detalhamento_1_da_fonte__tbs_', operator: 'EQ', value: 'WhatsApp' }
-            ]
-          },
-          // Email: Email Marketing + data_do_pagamento preenchida
-          {
-            filters: [
-              { propertyName: 'tbschool__data_do_pagamento', operator: 'HAS_PROPERTY' },
-              { propertyName: 'fonte__tbs_',                 operator: 'EQ', value: 'Email Marketing' }
-            ]
-          }
-        ],
-        properties: ['utm_term_tbs'],
+        filterGroups: [{ filters: [
+          { propertyName: 'pipeline',  operator: 'EQ', value: '904543067' },
+          { propertyName: 'dealstage', operator: 'EQ', value: '1372708683' }
+        ]}],
+        properties: ['hs_object_id'],
         limit: 100,
         ...(after && { after })
       })
     });
-    if (!resp.ok) throw new Error(`HubSpot Buyers ${resp.status}: ${await resp.text()}`);
+    if (!resp.ok) throw new Error(`HubSpot Deals ${resp.status}: ${await resp.text()}`);
     const data = await resp.json();
-
-    for (const { properties: p } of (data.results || [])) {
-      const term = p.utm_term_tbs || 'sem_term';
-      byTerm[term] = (byTerm[term] || 0) + 1;
-      total++;
-    }
-
+    for (const d of (data.results || [])) dealIds.push(d.id);
     after = data.paging?.next?.after;
   } while (after);
+
+  if (dealIds.length === 0) return { total: 0, byTerm: {} };
+
+  // 2. Contatos associados a cada deal
+  const dealToContacts = {};
+  const allAssocCids = new Set();
+
+  for (let i = 0; i < dealIds.length; i += 100) {
+    if (i > 0) await sleep(300);
+    const batch = dealIds.slice(i, i + 100);
+    const resp = await fetch('https://api.hubapi.com/crm/v4/associations/deals/contacts/batch/read', {
+      method: 'POST',
+      headers: HEADERS,
+      body: JSON.stringify({ inputs: batch.map(id => ({ id: String(id) })) })
+    });
+    if (!resp.ok) continue;
+    const data = await resp.json();
+    for (const result of (data.results || [])) {
+      const cids = (result.to || []).map(t => String(t.toObjectId));
+      dealToContacts[String(result.from.id)] = cids;
+      cids.forEach(cid => allAssocCids.add(cid));
+    }
+  }
+
+  // 3. Propriedades dos contatos associados (batch read)
+  const contactProps = {};
+  const cidList = [...allAssocCids];
+
+  for (let i = 0; i < cidList.length; i += 100) {
+    if (i > 0) await sleep(300);
+    const batch = cidList.slice(i, i + 100);
+    const resp = await fetch('https://api.hubapi.com/crm/v3/objects/contacts/batch/read', {
+      method: 'POST',
+      headers: HEADERS,
+      body: JSON.stringify({
+        inputs: batch.map(id => ({ id })),
+        properties: ['utm_term_tbs', 'fonte__tbs_', 'detalhamento_1_da_fonte__tbs_']
+      })
+    });
+    if (!resp.ok) continue;
+    const data = await resp.json();
+    for (const c of (data.results || [])) {
+      contactProps[String(c.id)] = c.properties;
+    }
+  }
+
+  // 4. Conta deals cujos contatos associados se qualificam
+  let total = 0;
+  const byTerm = {};
+
+  for (const [, cids] of Object.entries(dealToContacts)) {
+    const matchingCids = cids.filter(cid => qualifyContact(contactProps[cid]));
+    if (matchingCids.length === 0) continue;
+
+    total++;
+
+    const terms = new Set(matchingCids.map(cid => contactProps[cid]?.utm_term_tbs || 'sem_term'));
+    for (const term of terms) {
+      byTerm[term] = (byTerm[term] || 0) + 1;
+    }
+  }
 
   return { total, byTerm };
 }
