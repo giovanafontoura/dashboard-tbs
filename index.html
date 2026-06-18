@@ -209,16 +209,16 @@
   </div>
 
   <div class="nav">
-    <button class="tab-btn active" id="btn-crm"    onclick="setTab('crm')">CRM Consolidado</button>
+    <button class="tab-btn active" id="btn-dia"    onclick="setTab('dia')">Por dia</button>
+    <button class="tab-btn"        id="btn-crm"    onclick="setTab('crm')">CRM Consolidado</button>
     <button class="tab-btn"        id="btn-wa"     onclick="setTab('wa')">WhatsApp</button>
     <button class="tab-btn"        id="btn-em"     onclick="setTab('em')">Email</button>
-    <button class="tab-btn"        id="btn-dia"    onclick="setTab('dia')">Por dia</button>
     <button class="tab-btn"        id="btn-comp"   onclick="setTab('comp')">Compras</button>
     <button class="tab-btn"        id="btn-heat"   onclick="setTab('heat')">Heatmap</button>
   </div>
 
   <!-- CRM Consolidado -->
-  <div id="tab-crm">
+  <div id="tab-crm" style="display:none">
     <p class="nota">Inscrições por utm_term_tbs · verde = WhatsApp · azul = Email · amarelo = negócios The Best School</p>
     <div class="search-wrap">
       <input type="text" class="search-inp" id="srchCrm" oninput="setSearch('crm',this.value)" placeholder="Pesquisar term…">
@@ -269,7 +269,7 @@
   </div>
 
   <!-- Por dia -->
-  <div id="tab-dia" style="display:none">
+  <div id="tab-dia">
     <p class="nota">Inscrições por dia · verde = WhatsApp · azul = Email</p>
     <div class="chart-wrap" style="height:200px;margin-bottom:20px"><canvas id="cvDia"></canvas></div>
     <div id="divDia"></div>
@@ -360,7 +360,7 @@ const H = [
 // ─────────────────────────────────────────────────────────────────────────
 let crmChart = null, waChart = null, emChart = null, diaChart = null, metricsChart = null;
 let liveData = null;
-let activeTab = 'crm';
+let activeTab = 'dia';
 const PAGE = { crm:1, wa:1, 'wa-send':1, em:1, estats:1, dia:1, comp:1 };
 const PAGE_SIZE = { crm:10, wa:10, 'wa-send':10, em:10, estats:10, dia:10, comp:10 };
 let filterStart = null;
