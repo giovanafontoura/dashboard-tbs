@@ -852,11 +852,7 @@ function renderDiaChart(byDay) {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display:true, position:'top', labels:{ color:TC, font:{ size:10 }, boxWidth:10, padding:12 } },
-        tooltip: { callbacks: { afterBody: c => {
-          const idx = c[0].dataIndex;
-          return ['Inscritos: ' + (sorted[idx][1].wa + sorted[idx][1].em),
-                  'Compras: ' + ((mbd[sorted[idx][0]] || {compras:0}).compras || 0)];
-        }}}
+        tooltip: { mode:'index', intersect:false }
       },
       scales: {
         x:  { stacked:true, grid:{ color:GC }, ticks:{ color:TC, font:{ size:10 } } },
