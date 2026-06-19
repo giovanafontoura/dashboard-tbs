@@ -1018,13 +1018,40 @@ function renderCompTable() {
   const liveWA    = (liveData && liveData.waByTerm)    || {};
   const liveEM    = (liveData && liveData.emByTerm)    || {};
   const liveDeals = (liveData && liveData.dealsByTerm) || {};
-  let rows = filteredConv()
-    .map(r => ({
+
+  let rows;
+  const hasLive = liveData && !liveData._isDemo && Object.keys(liveDeals).length > 0;
+
+  if (hasLive) {
+    // Constrói linhas direto dos dados ao vivo — todos os utm_term com compras
+    rows = Object.entries(liveDeals)
+      .filter(([, d]) => d > 0)
+      .map(([term, d]) => {
+        const waInsc = liveWA[term] || 0;
+        const emInsc = liveEM[term] || 0;
+        const ch = waInsc > 0 ? 'WA' : emInsc > 0 ? 'Email' : '—';
+        return { t: term, ch, insc: waInsc + emInsc, d };
+      });
+    // Aplica filtro de data
+    if (filterStart || filterEnd) {
+      rows = rows.filter(r => {
+        const date = parseTermDate(r.t);
+        if (!date) return true;
+        if (filterStart && date < filterStart) return false;
+        if (filterEnd   && date > filterEnd)   return false;
+        return true;
+      });
+    }
+  } else {
+    // Fallback: CONV estático com overlay de dados ao vivo
+    rows = filteredConv().map(r => ({
       ...r,
       insc: r.ch === 'WA' ? (liveWA[r.t] ?? r.insc) : (liveEM[r.t] ?? r.insc),
       d:    liveDeals[r.t] ?? r.d
-    }))
-    .filter(r => !q || r.t.toLowerCase().includes(q));
+    }));
+  }
+
+  rows = rows.filter(r => !q || r.t.toLowerCase().includes(q));
 
   // ordenação
   const sf = compSort.f;
