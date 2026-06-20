@@ -83,14 +83,16 @@ export default async function handler(req, res) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// Retry automático em erros 5xx do HubSpot (502, 503, 504)
-async function fetchHS(url, options, retries = 3) {
-  for (let i = 0; i < retries; i++) {
-    if (i > 0) await sleep(2000 * i); // 2s → 4s backoff
+// Retry automático em 429 (rate limit) e 5xx do HubSpot
+async function fetchHS(url, options, retries = 4) {
+  for (let i = 0; i <= retries; i++) {
     const resp = await fetch(url, options);
-    if (resp.ok || resp.status < 500) return resp; // ok ou erro 4xx: não tenta de novo
-    console.warn(`[fetchHS] ${resp.status} na tentativa ${i + 1}/${retries}: ${url}`);
-    if (i === retries - 1) return resp; // última tentativa: retorna mesmo com erro
+    if (resp.ok) return resp;
+    if (resp.status !== 429 && resp.status < 500) return resp; // 4xx fixo: não retenta
+    if (i === retries) return resp;                             // esgotou tentativas
+    const wait = resp.status === 429 ? 2000 : 1500 * (i + 1); // 429 → 2s; 5xx → backoff
+    console.warn(`[fetchHS] ${resp.status} → retry ${i + 1}/${retries} em ${wait}ms`);
+    await sleep(wait);
   }
 }
 
@@ -112,7 +114,7 @@ async function fetchAllContacts(token) {
   const all = [];
   let after;
   do {
-    if (after) await sleep(300);
+    if (after) await sleep(500);
     const resp = await fetchHS(ENDPOINT, {
       method: 'POST',
       headers: HEADERS,
@@ -167,7 +169,7 @@ async function fetchDealsWithTerms(token) {
   const allAssocCids = new Set();
 
   for (let i = 0; i < dealIds.length; i += 100) {
-    if (i > 0) await sleep(150);
+    if (i > 0) await sleep(500);
     const batch = dealIds.slice(i, i + 100);
     const resp = await fetchHS('https://api.hubapi.com/crm/v4/associations/deals/contacts/batch/read', {
       method: 'POST',
@@ -190,7 +192,7 @@ async function fetchDealsWithTerms(token) {
   const cidList = [...allAssocCids];
 
   for (let i = 0; i < cidList.length; i += 100) {
-    if (i > 0) await sleep(150);
+    if (i > 0) await sleep(500);
     const batch = cidList.slice(i, i + 100);
     const resp = await fetchHS('https://api.hubapi.com/crm/v3/objects/contacts/batch/read', {
       method: 'POST',
