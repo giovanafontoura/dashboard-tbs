@@ -627,11 +627,15 @@ function sortComp(field) {
 // ─────────────────────────────────────────────────────────────────────────
 // CARREGAR DADOS
 // ─────────────────────────────────────────────────────────────────────────
+let _retryTimer = null;
+
 async function loadData() {
+  if (_retryTimer) { clearTimeout(_retryTimer); _retryTimer = null; }
   const btn = document.getElementById('btnRefresh');
+  const statusEl = document.getElementById('status');
   btn.classList.add('loading');
   btn.textContent = '↻ Atualizando…';
-  document.getElementById('status').textContent = 'Buscando dados no HubSpot…';
+  statusEl.textContent = 'Buscando dados no HubSpot…';
 
   loadSavedMetrics();
   try {
@@ -641,11 +645,23 @@ async function loadData() {
     if (!liveData.byDayByTerm) liveData.byDayByTerm = buildDemoByDayByTerm(liveData);
     renderAll(liveData);
   } catch (e) {
-    liveData = DEMO;
-    liveData.byDayByTerm = buildDemoByDayByTerm(liveData);
-    renderAll(liveData);
-    document.getElementById('status').textContent =
-      'Modo demonstração · dados de 12/06/2026 · no Vercel os dados serão ao vivo';
+    const is502 = e.message.includes('502') || e.message.includes('503') || e.message.includes('504');
+    if (is502) {
+      // HubSpot indisponível temporariamente — tenta novamente em 30s sem usar DEMO
+      let secs = 30;
+      const tick = () => {
+        statusEl.textContent = `HubSpot indisponível (servidor externo) · tentando novamente em ${secs}s…`;
+        if (secs-- > 0) { _retryTimer = setTimeout(tick, 1000); }
+        else { loadData(); }
+      };
+      tick();
+    } else {
+      // Erro de configuração ou local — usa DEMO
+      liveData = DEMO;
+      liveData.byDayByTerm = buildDemoByDayByTerm(liveData);
+      renderAll(liveData);
+      statusEl.textContent = 'Modo demonstração · ' + e.message;
+    }
   } finally {
     btn.classList.remove('loading');
     btn.textContent = '↻ Atualizar';
