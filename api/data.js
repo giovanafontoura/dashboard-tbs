@@ -83,6 +83,17 @@ export default async function handler(req, res) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// Retry automático em erros 5xx do HubSpot (502, 503, 504)
+async function fetchHS(url, options, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    if (i > 0) await sleep(2000 * i); // 2s → 4s backoff
+    const resp = await fetch(url, options);
+    if (resp.ok || resp.status < 500) return resp; // ok ou erro 4xx: não tenta de novo
+    console.warn(`[fetchHS] ${resp.status} na tentativa ${i + 1}/${retries}: ${url}`);
+    if (i === retries - 1) return resp; // última tentativa: retorna mesmo com erro
+  }
+}
+
 // Contatos qualificados: fonte WA ou Email OU utm_term = whatsapp/email/hs_mail/hs_automation
 function qualifyContact(p) {
   if (!p) return false;
@@ -102,7 +113,7 @@ async function fetchAllContacts(token) {
   let after;
   do {
     if (after) await sleep(300);
-    const resp = await fetch(ENDPOINT, {
+    const resp = await fetchHS(ENDPOINT, {
       method: 'POST',
       headers: HEADERS,
       body: JSON.stringify({
@@ -129,7 +140,7 @@ async function fetchDealsWithTerms(token) {
   let after;
   do {
     if (after) await sleep(150);
-    const resp = await fetch('https://api.hubapi.com/crm/v3/objects/deals/search', {
+    const resp = await fetchHS('https://api.hubapi.com/crm/v3/objects/deals/search', {
       method: 'POST',
       headers: HEADERS,
       body: JSON.stringify({
@@ -158,7 +169,7 @@ async function fetchDealsWithTerms(token) {
   for (let i = 0; i < dealIds.length; i += 100) {
     if (i > 0) await sleep(150);
     const batch = dealIds.slice(i, i + 100);
-    const resp = await fetch('https://api.hubapi.com/crm/v4/associations/deals/contacts/batch/read', {
+    const resp = await fetchHS('https://api.hubapi.com/crm/v4/associations/deals/contacts/batch/read', {
       method: 'POST',
       headers: HEADERS,
       body: JSON.stringify({ inputs: batch.map(id => ({ id: String(id) })) })
@@ -181,7 +192,7 @@ async function fetchDealsWithTerms(token) {
   for (let i = 0; i < cidList.length; i += 100) {
     if (i > 0) await sleep(150);
     const batch = cidList.slice(i, i + 100);
-    const resp = await fetch('https://api.hubapi.com/crm/v3/objects/contacts/batch/read', {
+    const resp = await fetchHS('https://api.hubapi.com/crm/v3/objects/contacts/batch/read', {
       method: 'POST',
       headers: HEADERS,
       body: JSON.stringify({
