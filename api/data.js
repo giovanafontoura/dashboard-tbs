@@ -119,7 +119,17 @@ async function fetchAllContacts(token) {
       method: 'POST',
       headers: HEADERS,
       body: JSON.stringify({
-        filterGroups: [{ filters: [{ propertyName: 'inscrito_tbs_2026', operator: 'EQ', value: 'Sim' }] }],
+        filterGroups: [
+          { filters: [
+            { propertyName: 'fonte__tbs_', operator: 'EQ', value: 'Organic Social' },
+            { propertyName: 'detalhamento_1_da_fonte__tbs_', operator: 'EQ', value: 'WhatsApp' },
+            { propertyName: 'inscrito_tbs_2026', operator: 'EQ', value: 'Sim' }
+          ]},
+          { filters: [
+            { propertyName: 'fonte__tbs_', operator: 'EQ', value: 'Email Marketing' },
+            { propertyName: 'inscrito_tbs_2026', operator: 'EQ', value: 'Sim' }
+          ]}
+        ],
         properties: ['utm_term_tbs', 'fonte__tbs_', 'detalhamento_1_da_fonte__tbs_', 'tbs_2026__data_de_inscricao'],
         limit: 200,
         ...(after && { after })

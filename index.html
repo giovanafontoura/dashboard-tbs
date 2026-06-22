@@ -640,7 +640,11 @@ async function loadData() {
   loadSavedMetrics();
   try {
     const res = await fetch('/api/data?_=' + Date.now(), { cache: 'no-store' });
-    if (!res.ok) throw new Error(`Erro ${res.status}`);
+    if (!res.ok) {
+      let body = '';
+      try { const j = await res.json(); body = j.error || JSON.stringify(j); } catch { body = await res.text().catch(() => ''); }
+      throw new Error(`Erro ${res.status}: ${body.slice(0, 200)}`);
+    }
     liveData = await res.json();
     if (!liveData.byDayByTerm) liveData.byDayByTerm = buildDemoByDayByTerm(liveData);
     renderAll(liveData);
