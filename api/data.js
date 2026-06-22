@@ -82,11 +82,13 @@ export default async function handler(req, res) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function hsGet(url, options) {
+async function hsGet(url, options, retries = 4) {
   const resp = await fetch(url, options);
-  if (resp.status === 429) {
-    await sleep(2000);
-    return fetch(url, options);
+  if (resp.status === 429 && retries > 0) {
+    const wait = (5 - retries) * 2000; // 2s, 4s, 6s, 8s
+    console.warn(`[hsGet] 429 rate limit, aguardando ${wait}ms (tentativas restantes: ${retries - 1})`);
+    await sleep(wait);
+    return hsGet(url, options, retries - 1);
   }
   return resp;
 }
@@ -97,7 +99,7 @@ async function fetchAllContacts(token) {
   const all = [];
   let after;
   do {
-    if (after) await sleep(300);
+    if (after) await sleep(500);
     const body = {
       filterGroups: [{ filters: [{ propertyName: 'inscrito_tbs_2026', operator: 'EQ', value: 'Sim' }] }],
       properties: ['utm_term_tbs','fonte__tbs_','detalhamento_1_da_fonte__tbs_','tbs_2026__data_de_inscricao'],
@@ -120,7 +122,7 @@ async function fetchDealsCount(token, allContactIds, contactToTerm) {
   const dealIds = [];
   let after;
   do {
-    if (after) await sleep(300);
+    if (after) await sleep(500);
     const body = {
       filterGroups: [{ filters: [
         { propertyName:'pipeline',  operator:'EQ', value:'904543067' },

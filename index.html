@@ -640,23 +640,28 @@ async function loadData() {
   loadSavedMetrics();
   try {
     const res = await fetch('/api/data?_=' + Date.now(), { cache: 'no-store' });
-    if (!res.ok) throw new Error(`Erro ${res.status}`);
+    if (!res.ok) {
+      let body = '';
+      try { body = await res.text(); } catch {}
+      throw new Error(`Erro ${res.status}: ${body.slice(0, 300)}`);
+    }
     liveData = await res.json();
     if (!liveData.byDayByTerm) liveData.byDayByTerm = buildDemoByDayByTerm(liveData);
     renderAll(liveData);
   } catch (e) {
-    const is502 = e.message.includes('502') || e.message.includes('503') || e.message.includes('504');
-    if (is502) {
-      // HubSpot indisponível temporariamente — tenta novamente em 30s sem usar DEMO
+    // Erros 5xx = problema temporário (HubSpot indisponível, rate limit) → retentar
+    const isRetryable = /\bErro 5\d\d\b/.test(e.message) || e.message.includes('Failed to fetch');
+    if (isRetryable) {
       let secs = 30;
+      const errDetail = e.message.replace('Erro ', 'HTTP ');
       const tick = () => {
-        statusEl.textContent = `HubSpot indisponível (servidor externo) · tentando novamente em ${secs}s…`;
+        statusEl.textContent = `Aguardando HubSpot · tentando novamente em ${secs}s… (${errDetail.slice(0,80)})`;
         if (secs-- > 0) { _retryTimer = setTimeout(tick, 1000); }
         else { loadData(); }
       };
       tick();
     } else {
-      // Erro de configuração ou local — usa DEMO
+      // Erro de configuração ou rede — usa DEMO
       liveData = DEMO;
       liveData.byDayByTerm = buildDemoByDayByTerm(liveData);
       renderAll(liveData);
