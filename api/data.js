@@ -94,10 +94,9 @@ async function hsGet(url, options, retries = 4) {
 }
 
 async function fetchAllContacts(token) {
-  // Tenta filtros em sequência — o 400 indica que a propriedade mudou de valor/tipo
+  // Tenta filtros em sequência — pula se 400 (prop inválida) OU se retornou 0 contatos
   const FILTERS_TO_TRY = [
     [{ propertyName: 'inscrito_tbs_2026', operator: 'EQ', value: 'Sim' }],
-    [{ propertyName: 'inscrito_tbs_2026', operator: 'EQ', value: 'true' }],
     [{ propertyName: 'inscrito_tbs_2026', operator: 'IS_KNOWN' }],
     [{ propertyName: 'tbs_2026__data_de_inscricao', operator: 'IS_KNOWN' }],
   ];
@@ -105,6 +104,10 @@ async function fetchAllContacts(token) {
   for (const filters of FILTERS_TO_TRY) {
     try {
       const result = await _paginateContacts(token, filters);
+      if (result.length === 0) {
+        console.warn(`[contacts] filtro retornou 0 contatos: ${JSON.stringify(filters[0])}, tentando próximo`);
+        continue;
+      }
       console.log(`[contacts] filtro OK: ${JSON.stringify(filters[0])} → ${result.length} contatos`);
       return result;
     } catch (e) {
@@ -115,7 +118,7 @@ async function fetchAllContacts(token) {
       throw e;
     }
   }
-  throw new Error('Todos os filtros de contatos falharam com 400');
+  throw new Error('Nenhum filtro de contatos retornou dados');
 }
 
 async function _paginateContacts(token, filters) {
