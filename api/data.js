@@ -119,7 +119,7 @@ async function fetchAllContacts(token) {
       method: 'POST',
       headers: HEADERS,
       body: JSON.stringify({
-        filterGroups: [{ filters: [{ propertyName: 'inscrito_tbs_2026', operator: 'IS_KNOWN' }] }],
+        filterGroups: [{ filters: [{ propertyName: 'tbs_2026__data_de_inscricao', operator: 'IS_KNOWN' }] }],
         properties: ['utm_term_tbs', 'fonte__tbs_', 'detalhamento_1_da_fonte__tbs_', 'tbs_2026__data_de_inscricao'],
         limit: 100,
         ...(after && { after })
