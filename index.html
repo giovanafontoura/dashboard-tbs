@@ -640,28 +640,23 @@ async function loadData() {
   loadSavedMetrics();
   try {
     const res = await fetch('/api/data?_=' + Date.now(), { cache: 'no-store' });
-    if (!res.ok) {
-      let body = '';
-      try { body = await res.text(); } catch {}
-      throw new Error(`Erro ${res.status}: ${body.slice(0, 300)}`);
-    }
+    if (!res.ok) throw new Error(`Erro ${res.status}`);
     liveData = await res.json();
     if (!liveData.byDayByTerm) liveData.byDayByTerm = buildDemoByDayByTerm(liveData);
     renderAll(liveData);
   } catch (e) {
-    // Erros 5xx = problema temporário (HubSpot indisponível, rate limit) → retentar
-    const isRetryable = /\bErro 5\d\d\b/.test(e.message) || e.message.includes('Failed to fetch');
-    if (isRetryable) {
+    const is502 = e.message.includes('502') || e.message.includes('503') || e.message.includes('504');
+    if (is502) {
+      // HubSpot indisponível temporariamente — tenta novamente em 30s sem usar DEMO
       let secs = 30;
-      const errDetail = e.message.replace('Erro ', 'HTTP ');
       const tick = () => {
-        statusEl.textContent = `Aguardando HubSpot · tentando novamente em ${secs}s… (${errDetail.slice(0,80)})`;
+        statusEl.textContent = `HubSpot indisponível (servidor externo) · tentando novamente em ${secs}s…`;
         if (secs-- > 0) { _retryTimer = setTimeout(tick, 1000); }
         else { loadData(); }
       };
       tick();
     } else {
-      // Erro de configuração ou rede — usa DEMO
+      // Erro de configuração ou local — usa DEMO
       liveData = DEMO;
       liveData.byDayByTerm = buildDemoByDayByTerm(liveData);
       renderAll(liveData);
@@ -871,7 +866,6 @@ function renderDiaChart(byDay) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      interaction: { mode:'index', intersect:false },
       plugins: {
         legend: { display:true, position:'top', labels:{ color:TC, font:{ size:10 }, boxWidth:10, padding:12 } },
         tooltip: { mode:'index', intersect:false }
@@ -1095,7 +1089,7 @@ function renderCompTable() {
     <th>utm_term_tbs</th><th>Canal</th>
     ${th('Inscrições','insc')}
     ${th('Negócios','deals')}
-    ${th('Conversão','rate')}
+    ${th('Conversão','rate','sortable')}
   </tr></thead><tbody>`;
 
   vis.forEach(r => {

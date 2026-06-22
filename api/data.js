@@ -8,32 +8,34 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { contacts, filterUsed } = await fetchAllContacts(token);
-    console.log(`[handler] ${contacts.length} contatos via filtro: ${filterUsed}`);
+    // Contacts é crítico — se falhar, retorna erro para o frontend usar DEMO
+    const contacts = await fetchAllContacts(token);
+
+    // Deals é não-fatal — se falhar, continua sem dados de compras
+    let buyersResult = { total: 0, byTerm: {} };
+    try {
+      buyersResult = await fetchDealsWithTerms(token);
+    } catch (dealsErr) {
+      console.error('Deals fetch failed (non-fatal):', dealsErr.message);
+    }
 
     const waByTerm    = {};
     const emByTerm    = {};
     const byDay       = {};
     const byDayByTerm = {};
-    const waIds       = new Set();
-    const emIds       = new Set();
-    const contactToTerm = {};
 
-    for (const { id, properties: p } of contacts) {
+    for (const { properties: p } of contacts) {
       const fonte = (p.fonte__tbs_ || '').toLowerCase();
       const det   = (p.detalhamento_1_da_fonte__tbs_ || '').toLowerCase();
       const isWA  = fonte === 'organic social' && det === 'whatsapp';
       const isEM  = fonte === 'email marketing';
+
       if (!isWA && !isEM) continue;
 
-      const sid  = String(id);
       const term = p.utm_term_tbs || 'sem_term';
       const day  = p.tbs_2026__data_de_inscricao
-                     ? p.tbs_2026__data_de_inscricao.slice(0, 10) : null;
-
-      if (isWA) waIds.add(sid);
-      if (isEM) emIds.add(sid);
-      contactToTerm[sid] = term;
+                     ? p.tbs_2026__data_de_inscricao.slice(0, 10)
+                     : null;
 
       if (isWA) {
         waByTerm[term] = (waByTerm[term] || 0) + 1;
@@ -55,23 +57,21 @@ export default async function handler(req, res) {
       }
     }
 
-    const allContactIds = new Set([...waIds, ...emIds]);
-
-    let dealsTotal = 0;
-    let dealsByTerm = {};
-    try {
-      ({ total: dealsTotal, byTerm: dealsByTerm } =
-        await fetchDealsCount(token, allContactIds, contactToTerm));
-    } catch (e) {
-      console.error('[deals] falhou (non-fatal):', e.message);
-    }
-
     const totWA = Object.values(waByTerm).reduce((a, b) => a + b, 0);
     const totEM = Object.values(emByTerm).reduce((a, b) => a + b, 0);
 
     return res.json({
-      waByTerm, emByTerm, byDay, byDayByTerm, dealsByTerm,
-      totals: { wa: totWA, em: totEM, total: totWA + totEM, deals: dealsTotal },
+      waByTerm,
+      emByTerm,
+      byDay,
+      byDayByTerm,
+      dealsByTerm: buyersResult.byTerm,
+      totals: {
+        wa:    totWA,
+        em:    totEM,
+        total: totWA + totEM,
+        deals: buyersResult.total
+      },
       updatedAt: new Date().toISOString()
     });
 
@@ -83,120 +83,68 @@ export default async function handler(req, res) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// Retry inteligente: 429 → 2s; 5xx → backoff; 4xx fixo → sem retry
-async function fetchHS(url, options, retries = 3) {
+// Retry automático em 429 (rate limit) e 5xx do HubSpot
+async function fetchHS(url, options, retries = 4) {
   for (let i = 0; i <= retries; i++) {
     const resp = await fetch(url, options);
     if (resp.ok) return resp;
-    if (resp.status !== 429 && resp.status < 500) return resp;
-    if (i === retries) return resp;
-    const wait = resp.status === 429 ? 2000 : 1000 * (i + 1);
+    if (resp.status !== 429 && resp.status < 500) return resp; // 4xx fixo: não retenta
+    if (i === retries) return resp;                             // esgotou tentativas
+    const wait = resp.status === 429 ? 2000 : 1500 * (i + 1); // 429 → 2s; 5xx → backoff
     console.warn(`[fetchHS] ${resp.status} → retry ${i + 1}/${retries} em ${wait}ms`);
     await sleep(wait);
   }
 }
 
-// Filtros em cascata (do mais preciso para o mais amplo).
-// Pula se 400 (propriedade inválida) ou se retornar 0 contatos WA/EM.
+// Contatos qualificados: fonte WA ou Email OU utm_term = whatsapp/email/hs_mail/hs_automation
+function qualifyContact(p) {
+  if (!p) return false;
+  const fonte = (p.fonte__tbs_ || '').toLowerCase();
+  const det   = (p.detalhamento_1_da_fonte__tbs_ || '').toLowerCase();
+  const term  = (p.utm_term_tbs || '').toLowerCase();
+  if (fonte === 'organic social' && det === 'whatsapp') return true;
+  if (fonte === 'email marketing') return true;
+  if (['whatsapp', 'email', 'hs_mail', 'hs_automation'].includes(term)) return true;
+  return false;
+}
+
 async function fetchAllContacts(token) {
   const ENDPOINT = 'https://api.hubapi.com/crm/v3/objects/contacts/search';
   const HEADERS  = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
-
-  const FILTERS = [
-    // 1. Por fonte diretamente — WA (det=whatsapp) ou EM, com data TBS 2026
-    {
-      label: 'fonte+data',
-      filterGroups: [
-        { filters: [
-          { propertyName: 'detalhamento_1_da_fonte__tbs_', operator: 'CONTAINS_TOKEN', value: 'whatsapp' },
-          { propertyName: 'tbs_2026__data_de_inscricao',   operator: 'IS_KNOWN' }
-        ]},
-        { filters: [
-          { propertyName: 'fonte__tbs_', operator: 'CONTAINS_TOKEN', value: 'email' },
-          { propertyName: 'tbs_2026__data_de_inscricao',  operator: 'IS_KNOWN' }
-        ]}
-      ]
-    },
-    // 2. Apenas pela data de inscrição TBS 2026 (isWA/isEM filtra na memória)
-    {
-      label: 'data_inscricao',
-      filterGroups: [
-        { filters: [{ propertyName: 'tbs_2026__data_de_inscricao', operator: 'IS_KNOWN' }] }
-      ]
-    },
-    // 3. Fallback: campo original (pode ter mudado de tipo/valor)
-    {
-      label: 'inscrito_sim',
-      filterGroups: [
-        { filters: [{ propertyName: 'inscrito_tbs_2026', operator: 'EQ', value: 'Sim' }] }
-      ]
-    },
-  ];
-
-  for (const { label, filterGroups } of FILTERS) {
-    let all;
-    try {
-      all = await _paginate(ENDPOINT, HEADERS, filterGroups);
-    } catch (e) {
-      if (e.message.includes(' 400')) {
-        console.warn(`[contacts] filtro "${label}" → 400, próximo`);
-        continue;
-      }
-      throw e;
-    }
-
-    const qualified = all.filter(({ properties: p }) => {
-      const fonte = (p.fonte__tbs_ || '').toLowerCase();
-      const det   = (p.detalhamento_1_da_fonte__tbs_ || '').toLowerCase();
-      return (fonte === 'organic social' && det === 'whatsapp') || fonte === 'email marketing';
-    });
-
-    if (qualified.length === 0) {
-      console.warn(`[contacts] filtro "${label}" → ${all.length} contatos mas 0 WA/EM, próximo`);
-      continue;
-    }
-
-    console.log(`[contacts] filtro "${label}" → ${all.length} total, ${qualified.length} WA/EM`);
-    return { contacts: all, filterUsed: label };
-  }
-
-  throw new Error('Nenhum filtro retornou contatos WA/EM');
-}
-
-async function _paginate(endpoint, headers, filterGroups) {
   const all = [];
   let after;
   do {
-    if (after) await sleep(300);
-    const resp = await fetchHS(endpoint, {
+    if (after) await sleep(500);
+    const resp = await fetchHS(ENDPOINT, {
       method: 'POST',
-      headers,
+      headers: HEADERS,
       body: JSON.stringify({
-        filterGroups,
+        filterGroups: [{ filters: [{ propertyName: 'inscrito_tbs_2026', operator: 'EQ', value: 'Sim' }] }],
         properties: ['utm_term_tbs', 'fonte__tbs_', 'detalhamento_1_da_fonte__tbs_', 'tbs_2026__data_de_inscricao'],
-        limit: 200,
+        limit: 100,
         ...(after && { after })
       })
     });
     if (!resp.ok) throw new Error(`HubSpot Contacts ${resp.status}: ${await resp.text()}`);
     const data = await resp.json();
     all.push(...(data.results || []));
-    after = data.paging?.next?.after ?? null;
+    after = data.paging?.next?.after;
   } while (after);
   return all;
 }
 
-async function fetchDealsCount(token, allContactIds, contactToTerm) {
-  const H = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+async function fetchDealsWithTerms(token) {
+  const HEADERS = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
-  // 1. Deal IDs em Negócio Fechado / The Best School
+  // 1. Todos os deals na etapa Negócio Fechado
+  console.log('[deals] buscando deal IDs...');
   const dealIds = [];
   let after;
   do {
-    if (after) await sleep(200);
+    if (after) await sleep(150);
     const resp = await fetchHS('https://api.hubapi.com/crm/v3/objects/deals/search', {
       method: 'POST',
-      headers: H,
+      headers: HEADERS,
       body: JSON.stringify({
         filterGroups: [{ filters: [
           { propertyName: 'pipeline',  operator: 'EQ', value: '904543067' },
@@ -210,36 +158,73 @@ async function fetchDealsCount(token, allContactIds, contactToTerm) {
     if (!resp.ok) throw new Error(`HubSpot Deals ${resp.status}: ${await resp.text()}`);
     const data = await resp.json();
     for (const d of (data.results || [])) dealIds.push(d.id);
-    after = data.paging?.next?.after ?? null;
+    after = data.paging?.next?.after;
   } while (after);
 
-  if (dealIds.length === 0) return { total: 0, byTerm: {} };
   console.log(`[deals] ${dealIds.length} deals encontrados`);
+  if (dealIds.length === 0) return { total: 0, byTerm: {} };
 
-  // 2. Associações deal → contato, cruza com contatos WA/EM já buscados
-  let total = 0;
-  const byTerm = {};
+  // 2. Contatos associados a cada deal
+  const dealToContacts = {};
+  const allAssocCids = new Set();
 
   for (let i = 0; i < dealIds.length; i += 100) {
-    if (i > 0) await sleep(200);
+    if (i > 0) await sleep(500);
     const batch = dealIds.slice(i, i + 100);
-    const resp = await fetchHS(
-      'https://api.hubapi.com/crm/v4/associations/deals/contacts/batch/read',
-      { method: 'POST', headers: H, body: JSON.stringify({ inputs: batch.map(id => ({ id: String(id) })) }) }
-    );
-    if (!resp.ok) continue;
+    const resp = await fetchHS('https://api.hubapi.com/crm/v4/associations/deals/contacts/batch/read', {
+      method: 'POST',
+      headers: HEADERS,
+      body: JSON.stringify({ inputs: batch.map(id => ({ id: String(id) })) })
+    });
+    if (!resp.ok) { console.error(`[assoc] erro ${resp.status}`); continue; }
     const data = await resp.json();
     for (const result of (data.results || [])) {
-      const matchingCids = (result.to || [])
-        .map(t => String(t.toObjectId))
-        .filter(cid => allContactIds.has(cid));
-      if (!matchingCids.length) continue;
-      total++;
-      const terms = new Set(matchingCids.map(cid => contactToTerm[cid] || 'sem_term'));
-      for (const t of terms) byTerm[t] = (byTerm[t] || 0) + 1;
+      const cids = (result.to || []).map(t => String(t.toObjectId));
+      dealToContacts[String(result.from?.id || '')] = cids;
+      cids.forEach(cid => allAssocCids.add(cid));
     }
   }
 
-  console.log(`[deals] ${total} qualificados`);
+  console.log(`[deals] ${allAssocCids.size} contatos associados`);
+
+  // 3. Propriedades dos contatos associados (batch read)
+  const contactProps = {};
+  const cidList = [...allAssocCids];
+
+  for (let i = 0; i < cidList.length; i += 100) {
+    if (i > 0) await sleep(500);
+    const batch = cidList.slice(i, i + 100);
+    const resp = await fetchHS('https://api.hubapi.com/crm/v3/objects/contacts/batch/read', {
+      method: 'POST',
+      headers: HEADERS,
+      body: JSON.stringify({
+        inputs: batch.map(id => ({ id })),
+        idProperty: 'hs_object_id',
+        properties: ['utm_term_tbs', 'fonte__tbs_', 'detalhamento_1_da_fonte__tbs_']
+      })
+    });
+    if (!resp.ok) continue;
+    const data = await resp.json();
+    for (const c of (data.results || [])) {
+      contactProps[String(c.id)] = c.properties;
+    }
+  }
+
+  // 4. Conta deals cujos contatos associados se qualificam
+  let total = 0;
+  const byTerm = {};
+
+  for (const [, cids] of Object.entries(dealToContacts)) {
+    const matchingCids = cids.filter(cid => qualifyContact(contactProps[cid]));
+    if (matchingCids.length === 0) continue;
+
+    total++;
+
+    const terms = new Set(matchingCids.map(cid => contactProps[cid]?.utm_term_tbs || 'sem_term'));
+    for (const term of terms) {
+      byTerm[term] = (byTerm[term] || 0) + 1;
+    }
+  }
+
   return { total, byTerm };
 }
