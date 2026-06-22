@@ -645,23 +645,16 @@ async function loadData() {
     if (!liveData.byDayByTerm) liveData.byDayByTerm = buildDemoByDayByTerm(liveData);
     renderAll(liveData);
   } catch (e) {
-    const is502 = e.message.includes('502') || e.message.includes('503') || e.message.includes('504');
-    if (is502) {
-      // HubSpot indisponível temporariamente — tenta novamente em 30s sem usar DEMO
-      let secs = 30;
-      const tick = () => {
-        statusEl.textContent = `HubSpot indisponível (servidor externo) · tentando novamente em ${secs}s…`;
-        if (secs-- > 0) { _retryTimer = setTimeout(tick, 1000); }
-        else { loadData(); }
-      };
-      tick();
-    } else {
-      // Erro de configuração ou local — usa DEMO
-      liveData = DEMO;
-      liveData.byDayByTerm = buildDemoByDayByTerm(liveData);
-      renderAll(liveData);
-      statusEl.textContent = 'Modo demonstração · ' + e.message;
-    }
+    let detail = e.message;
+    try {
+      // tenta extrair mensagem do JSON de erro do HubSpot
+      const m = detail.match(/\{.*\}/s);
+      if (m) { const j = JSON.parse(m[0]); detail = j.message || j.error || detail; }
+    } catch {}
+    liveData = DEMO;
+    liveData.byDayByTerm = buildDemoByDayByTerm(liveData);
+    renderAll(liveData);
+    statusEl.textContent = 'Erro ao buscar dados · ' + detail;
   } finally {
     btn.classList.remove('loading');
     btn.textContent = '↻ Atualizar';

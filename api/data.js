@@ -114,14 +114,14 @@ async function fetchAllContacts(token) {
   const all = [];
   let after;
   do {
-    if (after) await sleep(500);
+    if (after) await sleep(300);
     const resp = await fetchHS(ENDPOINT, {
       method: 'POST',
       headers: HEADERS,
       body: JSON.stringify({
         filterGroups: [{ filters: [{ propertyName: 'inscrito_tbs_2026', operator: 'EQ', value: 'Sim' }] }],
         properties: ['utm_term_tbs', 'fonte__tbs_', 'detalhamento_1_da_fonte__tbs_', 'tbs_2026__data_de_inscricao'],
-        limit: 100,
+        limit: 200,
         ...(after && { after })
       })
     });
