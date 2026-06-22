@@ -94,6 +94,31 @@ async function hsGet(url, options, retries = 4) {
 }
 
 async function fetchAllContacts(token) {
+  // Tenta filtros em sequência — o 400 indica que a propriedade mudou de valor/tipo
+  const FILTERS_TO_TRY = [
+    [{ propertyName: 'inscrito_tbs_2026', operator: 'EQ', value: 'Sim' }],
+    [{ propertyName: 'inscrito_tbs_2026', operator: 'EQ', value: 'true' }],
+    [{ propertyName: 'inscrito_tbs_2026', operator: 'IS_KNOWN' }],
+    [{ propertyName: 'tbs_2026__data_de_inscricao', operator: 'IS_KNOWN' }],
+  ];
+
+  for (const filters of FILTERS_TO_TRY) {
+    try {
+      const result = await _paginateContacts(token, filters);
+      console.log(`[contacts] filtro OK: ${JSON.stringify(filters[0])} → ${result.length} contatos`);
+      return result;
+    } catch (e) {
+      if (e.message.includes(' 400')) {
+        console.warn(`[contacts] 400 com filtro ${JSON.stringify(filters[0])}, tentando próximo`);
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw new Error('Todos os filtros de contatos falharam com 400');
+}
+
+async function _paginateContacts(token, filters) {
   const URL = 'https://api.hubapi.com/crm/v3/objects/contacts/search';
   const H   = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
   const all = [];
@@ -101,7 +126,7 @@ async function fetchAllContacts(token) {
   do {
     if (after) await sleep(500);
     const body = {
-      filterGroups: [{ filters: [{ propertyName: 'inscrito_tbs_2026', operator: 'EQ', value: 'Sim' }] }],
+      filterGroups: [{ filters }],
       properties: ['utm_term_tbs','fonte__tbs_','detalhamento_1_da_fonte__tbs_','tbs_2026__data_de_inscricao'],
       limit: 200,
       ...(after && { after })
