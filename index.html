@@ -866,6 +866,7 @@ function renderDiaChart(byDay) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
       plugins: {
         legend: { display:true, position:'top', labels:{ color:TC, font:{ size:10 }, boxWidth:10, padding:12 } },
         tooltip: { mode:'index', intersect:false }
@@ -1089,7 +1090,7 @@ function renderCompTable() {
     <th>utm_term_tbs</th><th>Canal</th>
     ${th('Inscrições','insc')}
     ${th('Negócios','deals')}
-    ${th('Conversão','rate','sortable')}
+    ${th('Conversão','rate')}
   </tr></thead><tbody>`;
 
   vis.forEach(r => {
