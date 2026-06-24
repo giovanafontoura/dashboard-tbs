@@ -430,9 +430,12 @@ const DEMO = {
 // UTILITÁRIOS DE DATA
 // ─────────────────────────────────────────────────────────────────────────
 function parseTermDate(t) {
-  const m = t.match(/(\d{2})(\d{2})(\d{2})$/);
-  if (!m) return null;
-  return `20${m[3]}-${m[2]}-${m[1]}`;
+  if (!t) return null;
+  let m = t.match(/(\d{2})(\d{2})(\d{2})$/);
+  if (m) return `20${m[3]}-${m[2]}-${m[1]}`;
+  m = t.match(/(\d{2})(\d{2})$/);
+  if (m) return `2026-${m[2]}-${m[1]}`;
+  return null;
 }
 
 function fmtDate(iso) {
@@ -912,12 +915,13 @@ function metricsByDay() {
 // ─────────────────────────────────────────────────────────────────────────
 function renderDiaTable(byDay) {
   const DS = ['dom','seg','ter','qua','qui','sex','sáb'];
-  const sorted = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
+  const mbd = metricsByDay();
+  // Inclui também datas com disparos manuais mas sem inscrições no HubSpot
+  const allDays = new Set([...Object.keys(byDay), ...Object.keys(mbd)]);
+  const sorted = [...allDays].sort().map(d => [d, byDay[d] || { wa: 0, em: 0 }]);
   const vis = slicePage(sorted, 'dia');
 
   let acum = sorted.slice(0, (PAGE.dia-1)*(PAGE_SIZE.dia||10)).reduce((s,[,v]) => s+v.wa+v.em, 0);
-
-  const mbd = metricsByDay();
 
   let h = `<thead><tr>
     <th>Dia</th><th></th>
