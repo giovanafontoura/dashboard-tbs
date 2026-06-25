@@ -887,7 +887,7 @@ function metricsByDay() {
   const out = {};
   const ensure = d => { out[d] = out[d] || { dispWA: 0, dispEM: 0, compras: 0 }; return out[d]; };
   Object.entries(waMetrics).forEach(([k, m]) => {
-    const d = parseTermDate(lbl(k));
+    const d = m.dataEnvio || parseTermDate(lbl(k));
     if (d && m.disparos)  ensure(d).dispWA  += m.disparos;
   });
   Object.entries(emailMetrics).forEach(([k, m]) => {
@@ -1201,6 +1201,7 @@ function renderWaSends(terms) {
 
   let h = `<thead><tr>
     <th>Disparo</th>
+    <th class="r" style="font-size:11px">Data</th>
     ${th('Disparados','disparos')}
     ${th('Aberturas','aberturas')}
     ${th('% Abert.','pAbr')}
@@ -1225,8 +1226,19 @@ function renderWaSends(terms) {
       return `<input class="inp-metric" type="number" min="0" data-term="${key}" data-field="${field}" value="${val || ''}" placeholder="0">`;
     }
 
+    const resolvedDate = m.dataEnvio || parseTermDate(lbl(key));
+    const fmtDate = d => d ? d.slice(8) + '/' + d.slice(5,7) : '—';
+    function cellDate() {
+      if (!waEditing) {
+        const style = m.dataEnvio ? 'color:var(--accent)' : 'color:var(--text3)';
+        return `<td class="r" style="font-size:11px;${style}">${fmtDate(resolvedDate)}</td>`;
+      }
+      return `<td class="r"><input class="inp-metric" type="date" data-term="${key}" data-field="dataEnvio" value="${resolvedDate || ''}" style="width:110px;padding:2px 4px;font-size:11px"></td>`;
+    }
+
     h += `<tr>
       <td style="padding-left:0">${lbl(key)}</td>
+      ${cellDate()}
       <td class="r">${cell('disparos', disp)}</td>
       <td class="r">${cell('aberturas', abr)}</td>
       <td class="r" style="color:${disp?'var(--text2)':'var(--text3)'}">${pAbr}</td>
@@ -1361,7 +1373,7 @@ function saveEdit(type) {
   document.querySelectorAll(selector).forEach(inp => {
     const term  = inp.dataset.term;
     const field = inp.dataset.field;
-    const val   = parseInt(inp.value) || 0;
+    const val   = inp.type === 'date' ? (inp.value || null) : (parseInt(inp.value) || 0);
     if (type === 'wa') {
       waMetrics[term] = waMetrics[term] || {};
       waMetrics[term][field] = val;
